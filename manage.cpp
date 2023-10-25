@@ -61,24 +61,42 @@ int main() {
 
 // Функция для замены значения поля в строке Lua-скрипта
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue) {
-    // Создаем строку для поиска паттерна
-    std::string pattern = fieldName + "\\s*=\\s*(.*?)([,)])";
+    std::vector<std::pair<size_t, std::string>> replacements;
 
-    // Создаем строку для замены
-    std::string replacement = fieldName + " = " + newValue;
-    std::cout << replacement << std::endl;
+    // Создаем строку для поиска паттерна
+    std::string pattern = fieldName + "\\s*=\\s*[^,]*";
+
     std::regex reg(pattern);
     std::sregex_iterator iter(scriptContent.begin(), scriptContent.end(), reg);
     std::sregex_iterator end;
 
     while (iter != end) {
-        for (size_t i = 1; i < iter->size(); i++) {
-            scriptContent.replace(iter->position(i), iter->length(i), newValue);
+        std::string match = iter->str();
+        std::size_t equalsPos = match.find('=');
+        if (equalsPos != std::string::npos) {
+            std::string field = match.substr(0, equalsPos);
+            // Убеждаемся, что это поле соответствует имени, иначе игнорируем
+            if (field.find(fieldName) != std::string::npos) {
+                std::string currentFieldValue = match.substr(equalsPos + 1);
+                // Проверяем, была ли замена уже выполнена
+                if (currentFieldValue != newValue) {
+                    // Сохраняем информацию о замене
+                    replacements.push_back({ iter->position() + equalsPos + 1, newValue });
+                }
+            }
         }
         ++iter;
     }
 
+    // Собираем исходный скрипт
+    for (auto it = replacements.rbegin(); it != replacements.rend(); ++it) {
+        scriptContent.replace(it->first, it->second.length(), it->second);
+    }
+
     return scriptContent;
 }
+
+
+
 
 
