@@ -81,7 +81,12 @@ std::string ReplaceField(std::string scriptContent, const std::string &fieldName
                 // Проверяем, была ли замена уже выполнена
                 if (currentFieldValue != newValue) {
                     // Сохраняем информацию о замене
-                    replacements.push_back({ iter->position() + equalsPos + 1, newValue });
+                    if (newValue.find("\"") == std::string::npos) {
+                        // Если newValue не содержит двойные кавычки, добавляем их
+                        replacements.push_back({ iter->position() + equalsPos + 1, "\"" + newValue + "\"" });
+                    } else {
+                        replacements.push_back({ iter->position() + equalsPos + 1, newValue });
+                    }
                 }
             }
         }
@@ -95,8 +100,3 @@ std::string ReplaceField(std::string scriptContent, const std::string &fieldName
 
     return scriptContent;
 }
-
-
-
-
-
