@@ -23,14 +23,14 @@ int main() {
     luaScriptFile.close();
 
     // Здесь будут считанные из перехваченного трафика значения
-    std::string newIPSrc = "New IP Source";
-    std::string newIPDst = "New IP Destination";
+    std::string newIPSrc = "127.0.0.1";
+    std::string newIPDst = "127.0.0.1";
     int newPortSrc = 54321;
     int newPortDst = 8080;
-    int newFlags = 0x10;
+    int newFlags = 0x02;
     int newSequence = 54321;
     int newAcknowledgment = 12345;
-    std::string newData = "New TCP Payload";
+    std::string newData = "Hello, TCP";
 
     // Заменяем поля структуры tcpHeader
     luaScriptContent = ReplaceField(luaScriptContent, "ip_src", newIPSrc);
@@ -61,26 +61,30 @@ int main() {
 
 // Функция для замены значения поля в строке Lua-скрипта
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue) {
-    std::regex pattern(fieldName + "\\s*=\\s*\"([^\"]*)\"|" + fieldName + "\\s*=\\s*([^,}]*)");
-    std::smatch match;
+    std::string target = fieldName + " = ";
 
-    // Создаем временную копию, чтобы избежать зацикливания
-    std::string tempContent = scriptContent;
+    size_t pos = scriptContent.find(target);
 
-    while (std::regex_search(tempContent, match, pattern)) {
-        std::string fieldValue;
-        if (match[1].str().empty()) {
-            fieldValue = match[2].str();
+    while (pos != std::string::npos) {
+        size_t startPos = pos + target.length();
+
+        // Определяем конец текущей строки
+        size_t endPos = scriptContent.find('\n', startPos);
+        if (endPos == std::string::npos) {
+            endPos = scriptContent.length();
+        }
+
+        // Вырезаем и заменяем значение
+        std::string oldValue = scriptContent.substr(startPos, endPos - startPos);
+        if (fieldName == "ip_src" || fieldName == "ip_dst" || fieldName == "data") {
+            scriptContent.replace(startPos, endPos - startPos, "\"" + newValue + "\",");
         } else {
-            fieldValue = match[1].str();
+            scriptContent.replace(startPos, endPos - startPos, newValue + ",");
         }
-        if (fieldValue != newValue) {
-            // Заменяем только если не совпадает со значением newValue
-            scriptContent.replace(match.position(), match.length(), fieldName + " = " + newValue);
-        }
-        tempContent = match.suffix();
+
+        // Поиск следующего вхождения
+        pos = scriptContent.find(target, endPos);
     }
 
     return scriptContent;
 }
-
