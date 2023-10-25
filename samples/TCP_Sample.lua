@@ -1,48 +1,42 @@
 local packet = require("packet")
 local stdnse = require("stdnse")
 
--- Функция для установки флагов в TCP-пакете на основе последовательности
-local function set_tcp_flags(tcpPacket, flags)
-    local flag_map = {
-        URG = 0x20,
-        ACK = 0x10,
-        PSH = 0x08,
-        RST = 0x04,
-        SYN = 0x02,
-        FIN = 0x01
-    }
+-- Создаем структуру для хранения параметров TCP-заголовка
+local tcpHeader = {
+    ip_src = "192.168.1.2",        -- IP-адрес отправителя
+    ip_dst = "192.168.1.1",        -- IP-адрес назначения
+    port_src = 12345,             -- Порт отправителя
+    port_dst = 80,                -- Порт назначения
+    flags = 0x02,                 -- Флаги TCP
+    sequence = 12345,             -- Номер последовательности
+    acknowledgment = 0,           -- Подтверждение
+    data = "This is a custom TCP packet." -- Полезная нагрузка
+}
 
-    -- Проходим по каждому флагу в последовательности и устанавливаем/снимаем его
-    for flag, value in pairs(flag_map) do
-        if flags:sub(flag, flag) == "1" then
-            tcpPacket:tcp_flags_set(value)
-        else
-            tcpPacket:tcp_flags_clear(value)
-        end
-    end
+-- Функция для создания TCP-пакета на основе переданных параметров
+local function build_tcp_packet(tcpHeader)
+    local tcpPacket = packet.Packet:new()
+
+    -- Устанавливаем значения полей TCP-пакета из структуры
+    tcpPacket:ip_saddr(tcpHeader.ip_src)
+    tcpPacket:ip_daddr(tcpHeader.ip_dst)
+    tcpPacket:ip_sport(tcpHeader.port_src)
+    tcpPacket:ip_dport(tcpHeader.port_dst)
+    tcpPacket:tcp_flags_set(tcpHeader.flags)
+    tcpPacket:tcp_seq(tcpHeader.sequence)
+    tcpPacket:tcp_ack(tcpHeader.acknowledgment)
+    tcpPacket:payload(tcpHeader.data)
+
+    -- Сборка пакета
+    tcpPacket:eth_build()
+    tcpPacket:ip_build()
+    tcpPacket:tcp_build()
+
+    return tcpPacket
 end
 
--- Принимаем последовательность из нулей и единиц
-local flags_sequence = "101010"
-
--- Создаем новый TCP-пакет
-local tcpPacket = packet.Packet:new()
-
--- Устанавливаем значения полей TCP-заголовка
-tcpPacket:ip_dport(80)
-tcpPacket:ip_sport(12345)
-
--- Устанавливаем флаги на основе последовательности
-set_tcp_flags(tcpPacket, flags_sequence)
-
--- Создаем данные для TCP-пакета (полезная нагрузка)
-local payload = "This is a TCP packet payload."
-tcpPacket:payload(payload)
-
--- Сборка пакета
-tcpPacket:eth_build()
-tcpPacket:ip_build()
-tcpPacket:tcp_build()
+-- Используем функцию для создания TCP-пакета
+local tcpPacket = build_tcp_packet(tcpHeader)
 
 -- Выводим собранный пакет
 local packetData = tcpPacket:get_packet()
