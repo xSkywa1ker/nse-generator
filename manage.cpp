@@ -43,7 +43,7 @@ int main() {
     luaScriptContent = ReplaceField(luaScriptContent, "data", newData);
 
     // Открываем файл Lua-скрипта для записи (перезаписи)
-    std::ofstream modifiedLuaScriptFile("samples/TCP_Sample.lua");
+    std::ofstream modifiedLuaScriptFile("results/TCP_Result.lua");
 
     if (!modifiedLuaScriptFile.is_open()) {
         std::cerr << "Failed to open Lua script file for writing." << std::endl;
