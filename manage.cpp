@@ -61,42 +61,26 @@ int main() {
 
 // Функция для замены значения поля в строке Lua-скрипта
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue) {
-    std::vector<std::pair<size_t, std::string>> replacements;
+    std::regex pattern(fieldName + "\\s*=\\s*\"([^\"]*)\"|" + fieldName + "\\s*=\\s*([^,}]*)");
+    std::smatch match;
 
-    // Создаем строку для поиска паттерна
-    std::string pattern = fieldName + "\\s*=\\s*[^,]*";
+    // Создаем временную копию, чтобы избежать зацикливания
+    std::string tempContent = scriptContent;
 
-    std::regex reg(pattern);
-    std::sregex_iterator iter(scriptContent.begin(), scriptContent.end(), reg);
-    std::sregex_iterator end;
-
-    while (iter != end) {
-        std::string match = iter->str();
-        std::size_t equalsPos = match.find('=');
-        if (equalsPos != std::string::npos) {
-            std::string field = match.substr(0, equalsPos);
-            // Убеждаемся, что это поле соответствует имени, иначе игнорируем
-            if (field.find(fieldName) != std::string::npos) {
-                std::string currentFieldValue = match.substr(equalsPos + 1);
-                // Проверяем, была ли замена уже выполнена
-                if (currentFieldValue != newValue) {
-                    // Сохраняем информацию о замене
-                    if (newValue.find("\"") == std::string::npos) {
-                        // Если newValue не содержит двойные кавычки, добавляем их
-                        replacements.push_back({ iter->position() + equalsPos + 1, "\"" + newValue + "\"" });
-                    } else {
-                        replacements.push_back({ iter->position() + equalsPos + 1, newValue });
-                    }
-                }
-            }
+    while (std::regex_search(tempContent, match, pattern)) {
+        std::string fieldValue;
+        if (match[1].str().empty()) {
+            fieldValue = match[2].str();
+        } else {
+            fieldValue = match[1].str();
         }
-        ++iter;
-    }
-
-    // Собираем исходный скрипт
-    for (auto it = replacements.rbegin(); it != replacements.rend(); ++it) {
-        scriptContent.replace(it->first, it->second.length(), it->second);
+        if (fieldValue != newValue) {
+            // Заменяем только если не совпадает со значением newValue
+            scriptContent.replace(match.position(), match.length(), fieldName + " = " + newValue);
+        }
+        tempContent = match.suffix();
     }
 
     return scriptContent;
 }
+
