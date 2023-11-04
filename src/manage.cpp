@@ -2,12 +2,13 @@
 #include <fstream>
 #include <string>
 #include <regex>
+#include "manage.h"
 
-std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue);
 
-int main() {
+
+int manager() {
     // Открываем файл Lua-скрипта для чтения
-    std::ifstream luaScriptFile("samples/TCP_Sample.lua");
+    std::ifstream luaScriptFile("samples/TCP_Sample.nse");
 
     if (!luaScriptFile.is_open()) {
         std::cerr << "Failed to open Lua script file." << std::endl;
@@ -43,7 +44,7 @@ int main() {
     luaScriptContent = ReplaceField(luaScriptContent, "data", newData);
 
     // Открываем файл Lua-скрипта для записи (перезаписи)
-    std::ofstream modifiedLuaScriptFile("results/TCP_Result.lua");
+    std::ofstream modifiedLuaScriptFile("results/TCP_Result.nse");
 
     if (!modifiedLuaScriptFile.is_open()) {
         std::cerr << "Failed to open Lua script file for writing." << std::endl;

@@ -32,9 +32,9 @@ sudo apt install lua-socket
 программу выдающую lua-скрипт, генерирующий такой пакет.
 1. Компиляция файла
 ```bash
-g++ -o manage manage.cpp
+g++ -o main main.cpp src/traffic_parser.cpp -lpcap
 ```
 2. Запуск
 ```bash
-./manage
+./main
 ```
