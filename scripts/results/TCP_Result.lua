@@ -3,14 +3,14 @@ local stdnse = require("stdnse")
 
 -- Создаем структуру для хранения параметров TCP-заголовка
 local tcpHeader = {
-    ip_src = New IP Source,             -- IP-адрес отправителя
-    ip_dst = New IP Destination,             -- IP-адрес назначения
-    port_src = 54321,             -- Порт отправителя
-    port_dst = 8080,             -- Порт назначения
-    flags = 16,                -- Флаги TCP
-    sequence = 54321,             -- Номер последовательности
-    acknowledgment = 12345,       -- Подтверждение
-    data = New TCP Payload                -- Полезная нагрузка
+    ip_src = "127.0.0.1",
+    ip_dst = "127.0.0.1",
+    port_src = 54321,
+    port_dst = 8080,
+    flags = 2,
+    sequence = 54321,
+    acknowledgment = 12345,
+    data = "Hello, TCP",
 }
 
 -- Функция для создания TCP-пакета на основе переданных параметров
