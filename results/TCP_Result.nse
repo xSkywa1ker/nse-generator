@@ -40,4 +40,3 @@ local tcpPacket = build_tcp_packet(tcpHeader)
 
 -- Выводим собранный пакет
 local packetData = tcpPacket:get_packet()
-stdnse.print("Сформированный TCP-пакет: %s", stdnse.tohex(packetData))
