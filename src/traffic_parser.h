@@ -1,9 +1,13 @@
-#ifndef LUA_SCRIPT_GENERATOR_TRAFFIC_PARSER_H
-#define LUA_SCRIPT_GENERATOR_TRAFFIC_PARSER_H
+#include "NetworkStructures.h"
 
-void traffic_parser();
+#ifndef TRAFFIC_PARSER_H
+#define TRAFFIC_PARSER_H
 
+int traffic_parser(const char* path_to_traffic);
 
+#endif
+void printIPHeader(const IPHeader* ipHeader);
 
-#endif //LUA_SCRIPT_GENERATOR_TRAFFIC_PARSER_H
+void printTCPHeader(const TCPHeader* tcpHeader);
 
+void printUDPHeader(const UDPHeader* udpHeader);

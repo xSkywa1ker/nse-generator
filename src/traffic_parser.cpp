@@ -1,9 +1,7 @@
-// main.cpp
 #include <iostream>
 #include <pcap.h>
 #include <cstdint>
 #include "traffic_parser.h"
-#include "NetworkStructures.h"
 #include <arpa/inet.h>
 
 
@@ -30,13 +28,8 @@ void printUDPHeader(const UDPHeader* udpHeader) {
     std::cout << "  Length: " << ntohs(udpHeader->uh_ulen) << std::endl;
 }
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " input.pcapng" << std::endl;
-        return 1;
-    }
-
-    const char* pcapFile = argv[1];
+int traffic_parser(const char* path_to_traffic) {
+    const char* pcapFile = path_to_traffic;
     char errbuf[PCAP_ERRBUF_SIZE];
 
     // Открываем файл pcapng для чтения
