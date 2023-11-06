@@ -2,7 +2,8 @@
 #define LUA_SCRIPT_GENERATOR_MANAGE_H
 
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue);
-int manager();
+int manager(std::string newIPSrc, std::string newIPDst,int newPortSrc,int newPortDst,int newFlags,int newSequence,
+            int newAcknowledgment,std::string newData);
 
 #endif //LUA_SCRIPT_GENERATOR_MANAGE_H
 
