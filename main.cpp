@@ -1,6 +1,6 @@
 #include "src/traffic_parser.h"
 
-int main(){
+int main() {
     traffic_parser("traffic/discover.pcapng");
     return 1;
 }
