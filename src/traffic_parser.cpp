@@ -56,6 +56,7 @@ int traffic_parser(const char* path_to_traffic) {
                 if (ipHeader->ip_p == 6) {
                     // Пакет TCP
                     TCPHeader* tcpHeader = (TCPHeader*)(packetData + 14 + ((ipHeader->ip_vhl & 0x0F) << 2));
+                    // TODO добавить передачу пакета на вход функции manage
                     printTCPHeader(tcpHeader);
                 } else if (ipHeader->ip_p == 17) {
                     // Пакет UDP
