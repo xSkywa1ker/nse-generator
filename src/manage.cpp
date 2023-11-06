@@ -6,7 +6,8 @@
 
 
 
-int manager() {
+int manager(std::string newIPSrc, std::string newIPDst,int newPortSrc,int newPortDst,int newFlags,int newSequence,
+            int newAcknowledgment) {
     // Открываем файл Lua-скрипта для чтения
     std::ifstream luaScriptFile("samples/TCP_Sample.nse");
 
@@ -23,15 +24,7 @@ int manager() {
     }
     luaScriptFile.close();
 
-    // Здесь будут считанные из перехваченного трафика значения
-    std::string newIPSrc = "127.0.0.1";
-    std::string newIPDst = "127.0.0.1";
-    int newPortSrc = 54321;
-    int newPortDst = 8080;
-    int newFlags = 0x02;
-    int newSequence = 54321;
-    int newAcknowledgment = 12345;
-    std::string newData = "Hello, TCP";
+    std::string newData = "Hello tcp";
 
     // Заменяем поля структуры tcpHeader
     luaScriptContent = ReplaceField(luaScriptContent, "ip_src", newIPSrc);
