@@ -60,7 +60,7 @@ int traffic_parser(const char* path_to_traffic) {
                     // TODO добавить передачу пакета на вход функции manage
                     manager(inet_ntoa(*(in_addr*)&ipHeader->ip_src),inet_ntoa(*(in_addr*)&ipHeader->ip_dst),
                            ntohs(tcpHeader->th_sport),ntohs(tcpHeader->th_dport),(tcpHeader->th_flags),
-                           ntohl(tcpHeader->th_seq),ntohl(tcpHeader->th_ack))
+                           ntohl(tcpHeader->th_seq),ntohl(tcpHeader->th_ack));
                     printTCPHeader(tcpHeader);
                 } else if (ipHeader->ip_p == 17) {
                     // Пакет UDP
