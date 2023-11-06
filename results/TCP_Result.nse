@@ -3,14 +3,14 @@ local stdnse = require("stdnse")
 
 -- Создаем структуру для хранения параметров TCP-заголовка
 local tcpHeader = {
-    ip_src = "127.0.0.1",
-    ip_dst = "127.0.0.1",
-    port_src = 54321,
-    port_dst = 8080,
-    flags = 2,
-    sequence = 54321,
-    acknowledgment = 12345,
-    data = "Hello, TCP",
+    ip_src = "169.254.74.46",
+    ip_dst = "169.254.74.46",
+    port_src = 52900,
+    port_dst = 139,
+    flags = 20,
+    sequence = 2861104898,
+    acknowledgment = 927254732,
+    data = "Hello tcp",
 }
 
 -- Функция для создания TCP-пакета на основе переданных параметров
@@ -40,3 +40,4 @@ local tcpPacket = build_tcp_packet(tcpHeader)
 
 -- Выводим собранный пакет
 local packetData = tcpPacket:get_packet()
+stdnse.print("Сформированный TCP-пакет: %s", stdnse.tohex(packetData))
