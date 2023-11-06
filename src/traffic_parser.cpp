@@ -58,7 +58,7 @@ int traffic_parser(const char* path_to_traffic) {
                     // Пакет TCP
                     TCPHeader* tcpHeader = (TCPHeader*)(packetData + 14 + ((ipHeader->ip_vhl & 0x0F) << 2));
                     // TODO добавить передачу пакета на вход функции manage
-                    manage(inet_ntoa(*(in_addr*)&ipHeader->ip_src),inet_ntoa(*(in_addr*)&ipHeader->ip_dst),
+                    manager(inet_ntoa(*(in_addr*)&ipHeader->ip_src),inet_ntoa(*(in_addr*)&ipHeader->ip_dst),
                            ntohs(tcpHeader->th_sport),ntohs(tcpHeader->th_dport),(tcpHeader->th_flags),
                            ntohl(tcpHeader->th_seq),ntohl(tcpHeader->th_ack))
                     printTCPHeader(tcpHeader);
