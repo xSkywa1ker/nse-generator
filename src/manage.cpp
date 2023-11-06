@@ -5,8 +5,8 @@
 #include "manage.h"
 
 
-int manager(std::string newIPSrc, std::string newIPDst, int newPortSrc, int newPortDst, int newFlags, int newSequence,
-            int newAcknowledgment) {
+int manager(char* newIPSrc, char* newIPDst, uint16_t newPortSrc, uint16_t newPortDst, uint8_t newFlags, uint32_t newSequence,
+            uint32_t newAcknowledgment) {
     // Открываем файл Lua-скрипта для чтения
     std::ifstream luaScriptFile("samples/TCP_Sample.nse");
 
