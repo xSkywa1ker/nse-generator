@@ -38,3 +38,7 @@ g++ -o main main.cpp src/traffic_parser.cpp -lpcap
 ```bash
 ./main
 ```
+
+### Тестировочный трафик:
+1. discover.pcapng (**Проверка 139 порта**)
+2. vulnerability.pcapng (**Уязвимость нахождения MAC-адреса**)
