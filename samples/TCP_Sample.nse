@@ -1,36 +1,87 @@
-local packet = require("packet")
-local stdnse = require("stdnse")
+local socket = require("socket")
+
+-- Функция для конвертации IP-адресов в бинарный формат
+local function ip_to_binary(ip)
+    local parts = {}
+    for part in ip:gmatch("%d+") do
+        parts[#parts + 1] = string.char(tonumber(part))
+    end
+    return table.concat(parts)
+end
+
+-- Функция для вычисления контрольной суммы IP-пакета
+local function calculate_ip_checksum(ipPacket)
+    local header = ipPacket
+    local sum = 0
+    local numShorts = #header // 2
+
+    for i = 1, numShorts do
+        local part = header:byte(i * 2 - 1) * 256 + header:byte(i * 2)
+        sum = sum + part
+    end
+
+    while sum > 0xFFFF do
+        sum = (sum & 0xFFFF) + (sum >> 16)
+    end
+
+    return string.char(0xFF - sum)
+end
+
+-- Функция для преобразования данных в шестнадцатеричное представление
+local function tohex(data)
+    local hex = ""
+    for i = 1, #data do
+        hex = hex .. string.format("%02X", data:byte(i))
+    end
+    return hex
+end
 
 -- Создаем структуру для хранения параметров TCP-заголовка
 local tcpHeader = {
-    ip_src = " ",             -- IP-адрес отправителя
-    ip_dst = " ",             -- IP-адрес назначения
-    port_src = 0,             -- Порт отправителя
-    port_dst = 0,             -- Порт назначения
-    flags = 0,                -- Флаги TCP
-    sequence = 0,             -- Номер последовательности
-    acknowledgment = 0,       -- Подтверждение
-    data = " "                -- Полезная нагрузка
+    ip_src = "",
+    ip_dst = "",
+    port_src = 0,
+    port_dst = 0,
+    sequence = 0,
+    acknowledgment = 0,
+    data = "",
 }
 
 -- Функция для создания TCP-пакета на основе переданных параметров
 local function build_tcp_packet(tcpHeader)
-    local tcpPacket = packet.Packet:new()
+    local tcpPacket = {
+        eth = {
+            src = "\x00\x00\x00\x00\x00\x00", -- Замените на ваш MAC-адрес
+            dst = "\x00\x00\x00\x00\x00\x00", -- Замените на MAC-адрес назначения
+            ethertype = "\x08\x00" -- IPv4
+        },
+        ip = {
+            ver_ihl = "\x45", -- IPv4 и заголовок длиной 20 байт
+            tos = "\x00",
+            len = "\x00\x00", -- Будет заполнено автоматически
+            id = "\x00\x00", -- Будет заполнено автоматически
+            flags_frag = "\x00\x00", -- Будет заполнено автоматически
+            ttl = "\x40", -- TTL (64)
+            proto = "\x06", -- TCP
+            csum = "\x00\x00", -- Будет заполнено автоматически
+            src = ip_to_binary(tcpHeader.ip_src), -- Исходный IP-адрес
+            dst = ip_to_binary(tcpHeader.ip_dst) -- IP-адрес назначения
+        },
+        tcp = {
+            sport = tcpHeader.port_src, -- Исходный порт
+            dport = tcpHeader.port_dst, -- Порт назначения
+            seq = tcpHeader.sequence, -- Последовательность
+            ack = tcpHeader.acknowledgment, -- Подтверждение
+            data = tcpHeader.data
+        }
+    }
 
-    -- Устанавливаем значения полей TCP-пакета из структуры
-    tcpPacket:ip_saddr(tcpHeader.ip_src)
-    tcpPacket:ip_daddr(tcpHeader.ip_dst)
-    tcpPacket:ip_sport(tcpHeader.port_src)
-    tcpPacket:ip_dport(tcpHeader.port_dst)
-    tcpPacket:tcp_flags_set(tcpHeader.flags)
-    tcpPacket:tcp_seq(tcpHeader.sequence)
-    tcpPacket:tcp_ack(tcpHeader.acknowledgment)
-    tcpPacket:payload(tcpHeader.data)
+    -- Рассчитываем и устанавливаем длину IP-пакета
+    local ip_len = #tcpPacket.ip + #tcpPacket.tcp.data
+    tcpPacket.ip.len = string.pack(">I2", ip_len)
 
-    -- Сборка пакета
-    tcpPacket:eth_build()
-    tcpPacket:ip_build()
-    tcpPacket:tcp_build()
+    -- Рассчитываем и устанавливаем контрольную сумму IP-пакета
+    tcpPacket.ip.csum = calculate_ip_checksum(tcpPacket.ip)
 
     return tcpPacket
 end
@@ -38,6 +89,8 @@ end
 -- Используем функцию для создания TCP-пакета
 local tcpPacket = build_tcp_packet(tcpHeader)
 
--- Выводим собранный пакет
-local packetData = tcpPacket:get_packet()
-stdnse.print("Сформированный TCP-пакет: %s", stdnse.tohex(packetData))
+-- Создаем и отправляем сокет с использованием luasocket
+local client = assert(socket.tcp())
+client:connect(tcpHeader.ip_src, tcpHeader.port_dst)
+client:send(tcpPacket.eth.src .. tcpPacket.eth.dst .. tcpPacket.eth.ethertype .. tcpPacket.ip.ver_ihl .. tcpPacket.ip.tos .. tcpPacket.ip.len .. tcpPacket.ip.id .. tcpPacket.ip.flags_frag .. tcpPacket.ip.ttl .. tcpPacket.ip.proto .. tcpPacket.ip.csum .. tcpPacket.ip.src .. tcpPacket.ip.dst .. tcpPacket.tcp.sport .. tcpPacket.tcp.dport .. tcpPacket.tcp.seq .. tcpPacket.tcp.ack .. tcpPacket.tcp.data)
+client:close()
