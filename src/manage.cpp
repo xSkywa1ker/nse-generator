@@ -5,8 +5,8 @@
 #include "manage.h"
 
 
-
-int manager() {
+int manager(char* newIPSrc, char* newIPDst, uint16_t newPortSrc, uint16_t newPortDst, uint8_t newFlags, uint32_t newSequence,
+            uint32_t newAcknowledgment) {
     // Открываем файл Lua-скрипта для чтения
     std::ifstream luaScriptFile("samples/TCP_Sample.nse");
 
@@ -23,15 +23,7 @@ int manager() {
     }
     luaScriptFile.close();
 
-    // Здесь будут считанные из перехваченного трафика значения
-    std::string newIPSrc = "127.0.0.1";
-    std::string newIPDst = "127.0.0.1";
-    int newPortSrc = 54321;
-    int newPortDst = 8080;
-    int newFlags = 0x02;
-    int newSequence = 54321;
-    int newAcknowledgment = 12345;
-    std::string newData = "Hello, TCP";
+    std::string newData = "Hello tcp";
 
     // Заменяем поля структуры tcpHeader
     luaScriptContent = ReplaceField(luaScriptContent, "ip_src", newIPSrc);
