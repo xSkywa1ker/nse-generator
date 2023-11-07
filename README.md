@@ -39,6 +39,13 @@ g++ -o main main.cpp src/traffic_parser.cpp src/manage.cpp -lpcap
 ./main
 ```
 
+## Запуск сформированного скрипта
+
+### Запуск  nse скрипта:
+```bash
+lua results/TCP_Result.nse
+```
+
 ### Тестировочный трафик:
 1. discover.pcapng (**Проверка 139 порта**)
 2. vulnerability.pcapng (**Уязвимость нахождения MAC-адреса**)
