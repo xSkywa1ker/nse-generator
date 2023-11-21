@@ -4,6 +4,13 @@
 
 #include <cstdint>
 #include <arpa/inet.h>
+#include <vector>
+
+struct EthernetHeader {
+    std::vector<uint8_t> dest_mac;
+    std::vector<uint8_t> src_mac;
+    uint16_t ethertype;
+};
 
 struct IPHeader {
     uint8_t ip_vhl;
