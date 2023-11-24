@@ -1,13 +1,19 @@
 #include <iostream>
 #include <cstring>
 #include <pcap.h>
-#include <pcap/sll.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/ether.h>
 #include <arpa/inet.h>
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
+
+// Структура для Ethernet-заголовка
+struct EthernetHeader {
+    uint8_t dest_mac[ETH_ALEN] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55}; // Указать реальный MAC-адрес получателя
+    uint8_t src_mac[ETH_ALEN] = {0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB};   // Указать реальный MAC-адрес отправителя
+    uint16_t ethertype = htons(ETHERTYPE_IP);                           // IPv4 Ethertype
+};
 
 // Структура для IP-заголовка
 struct IPHeader {
@@ -16,7 +22,7 @@ struct IPHeader {
     uint16_t tot_len = 0;       // Total Length (will be filled later)
     uint16_t id = htons(0x1234); // Identification
     uint16_t frag_off = 0;       // Fragment Offset
-    uint8_t ttl = 255;           // Time to Live
+    uint8_t ttl = 128;           // Time to Live
     uint8_t protocol = IPPROTO_TCP; // TCP protocol
     uint16_t check = 0;          // Checksum (will be filled later)
     in_addr saddr = {};          // Source IP Address (will be filled later)
@@ -38,6 +44,7 @@ struct TCPHeader {
 
 // Структура для TCP-пакета
 struct TCPPacket {
+    EthernetHeader ethernet_header;
     IPHeader ip_header;
     TCPHeader tcp_header;
     const char *payload = "Hello, World!"; // Payload
@@ -65,15 +72,23 @@ void send_tcp_packet() {
         return;
     }
 
-    // Заполняем структуру pcap_pkthdr (заголовок пакета)
-    struct pcap_pkthdr packet_header;
-    packet_header.ts.tv_sec = 0;
-    packet_header.ts.tv_usec = 0;
-    packet_header.len = sizeof(TCPPacket);
-    packet_header.caplen = packet_header.len;
+    // Создаем буфер для сырых данных пакета
+    uint8_t buffer[sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size];
+
+    // Копируем данные Ethernet-заголовка
+    std::memcpy(buffer, &tcpPacket.ethernet_header, sizeof(EthernetHeader));
+
+    // Копируем данные IP-заголовка
+    std::memcpy(buffer + sizeof(EthernetHeader), &tcpPacket.ip_header, sizeof(IPHeader));
+
+    // Копируем данные TCP-заголовка
+    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader), &tcpPacket.tcp_header, sizeof(TCPHeader));
+
+    // Копируем данные payload
+    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader), tcpPacket.payload, tcpPacket.payload_size);
 
     // Отправляем пакет
-    if (pcap_sendpacket(send_handle, reinterpret_cast<const u_char *>(&tcpPacket), packet_header.len) != 0) {
+    if (pcap_sendpacket(send_handle, buffer, sizeof(buffer)) != 0) {
         std::cerr << "Ошибка при отправке пакета: " << pcap_geterr(send_handle) << std::endl;
     }
 
@@ -105,7 +120,6 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len) {
     return answer;
 }
 
-int main()
-{
+int main() {
     send_tcp_packet();
 }
