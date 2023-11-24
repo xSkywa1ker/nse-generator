@@ -1,105 +1,143 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <fstream>
+#include <cstring>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/ether.h>
 #include <arpa/inet.h>
 
-// Структура для Ethernet-заголовка
 struct EthernetHeader {
-    uint8_t dest_mac[6]; // Указать реальный MAC-адрес получателя
-    uint8_t src_mac[6];  // Указать реальный MAC-адрес отправителя
-    uint16_t ethertype;  // IPv4 Ethertype
+    uint8_t dest_mac[ETH_ALEN];
+    uint8_t src_mac[ETH_ALEN];
+    uint16_t ethertype;
 };
 
-// Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl;     // IPv4, Header Length (5 words)
-    uint8_t tos;             // Type of Service
-    uint16_t tot_len;        // Total Length (will be filled later)
-    uint16_t id;             // Identification
-    uint16_t frag_off;       // Fragment Offset
-    uint8_t ttl;             // Time to Live
-    uint8_t protocol;        // TCP protocol
-    uint16_t check;          // Checksum (will be filled later)
-    struct in_addr saddr;    // Source IP Address (will be filled later)
-    struct in_addr daddr;    // Destination IP Address (will be filled later)
+    uint8_t version_ihl;
+    uint8_t tos;
+    uint16_t tot_len;
+    uint16_t id;
+    uint16_t frag_off;
+    uint8_t ttl;
+    uint8_t protocol;
+    uint16_t check;
+    in_addr saddr;
+    in_addr daddr;
 };
 
-// Структура для TCP-заголовка
 struct TCPHeader {
-    uint16_t source;         // Source Port
-    uint16_t dest;           // Destination Port
-    uint32_t seq;            // Sequence Number
-    uint32_t ack_seq;        // Acknowledgment Number
-    uint8_t doff_reserved;   // Data Offset (5 words), Reserved
-    uint8_t flags;           // SYN flag
-    uint16_t window;         // Window
-    uint16_t check;          // Checksum (will be filled later)
-    uint16_t urg_ptr;        // Urgent Pointer
+    uint16_t source;
+    uint16_t dest;
+    uint32_t seq;
+    uint32_t ack_seq;
+    uint8_t doff_reserved;
+    uint8_t flags;
+    uint16_t window;
+    uint16_t check;
+    uint16_t urg_ptr;
 };
 
-// Структура для TCP-пакета
 struct TCPPacket {
-    struct EthernetHeader ethernet_header;
-    struct IPHeader ip_header;
-    struct TCPHeader tcp_header;
-    const char *payload;     // Payload
+    EthernetHeader ethernet_header;
+    IPHeader ip_header;
+    TCPHeader tcp_header;
+    const char *payload;
     size_t payload_size;
 };
 
-// Функция для заполнения значений полей структур из переданного пакета
-void fill_tcp_packet(struct TCPPacket *tcpPacket, const u_char *receivedPacket) {
-    // Пример: Разбор Ethernet-заголовка
-    memcpy(tcpPacket->ethernet_header.dest_mac, receivedPacket, 6);
-    memcpy(tcpPacket->ethernet_header.src_mac, receivedPacket + 6, 6);
-    tcpPacket->ethernet_header.ethertype = ntohs(*(uint16_t *)(receivedPacket + 12));
+uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
-    // Пример: Разбор IP-заголовка
-    tcpPacket->ip_header.version_ihl = receivedPacket[14] >> 4;
-    tcpPacket->ip_header.tos = receivedPacket[15];
-    tcpPacket->ip_header.tot_len = ntohs(*(uint16_t *)(receivedPacket + 16));
-    tcpPacket->ip_header.id = ntohs(*(uint16_t *)(receivedPacket + 18));
-    // Продолжите разбор для остальных полей IP-заголовка
+void fillFields(const TCPPacket& tcpPacket, const std::string& outputFile) {
+    std::fstream output(outputFile, std::ios::in | std::ios::out); // Открываем файл для чтения и записи
+
+    if (!output) {
+        std::cerr << "Не удалось открыть файл tcp_result.cpp\n";
+        return;
+    }
+
+    std::string line;
+    std::streampos lastPos = 0;
+
+    while (std::getline(output, line)) {
+        lastPos = output.tellg();  // Запоминаем текущую позицию в файле
+
+        // Ищем строки, в которых нужно заполнить поля
+        if (line.find("{") != std::string::npos) {
+            output.seekp(lastPos);  // Возвращаемся на последнюю позицию
+            output << "{";
+            for (int i = 0; i < ETH_ALEN; ++i) {
+                output << static_cast<int>(tcpPacket.ethernet_header.dest_mac[i]);
+                if (i < ETH_ALEN - 1) output << ", ";
+            }
+            output << "};\n";
+        } else if (line.find("tcpPacket.ethernet_header.src_mac") != std::string::npos) {
+            output.seekp(lastPos);  // Возвращаемся на последнюю позицию
+            output << "    tcpPacket.ethernet_header.src_mac = {";
+            for (int i = 0; i < ETH_ALEN; ++i) {
+                output << static_cast<int>(tcpPacket.ethernet_header.src_mac[i]);
+                if (i < ETH_ALEN - 1) output << ", ";
+            }
+            output << "};\n";
+        }
+        // Добавьте аналогичные блоки для других полей
+    }
+
+    output.close();
 }
 
-// Функция для заполнения и записи значений полей структур в файл
-void fill_values_in_file(struct TCPPacket *tcpPacket, const char *output_file) {
-    FILE *file = fopen(output_file, "w");
-    if (!file) {
-        perror("Ошибка при открытии файла tcp_result.cpp для записи");
-        exit(EXIT_FAILURE);
-    }
+void fillPacket(TCPPacket& tcpPacket) {
+    // Заполняем IP-заголовок
+    tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
+    tcpPacket.ip_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.ip_header), sizeof(IPHeader)));
 
-    // Записываем dest_mac
-    fprintf(file, "    {");
-    for (int i = 0; i < 6; ++i) {
-        fprintf(file, "%u", tcpPacket->ethernet_header.dest_mac[i]);
-        if (i < 5) fprintf(file, ", ");
-    }
-    fprintf(file, "},\n");
-
-    // Записываем src_mac
-    fprintf(file, "    {");
-    for (int i = 0; i < 6; ++i) {
-        fprintf(file, "%u", tcpPacket->ethernet_header.src_mac[i]);
-        if (i < 5) fprintf(file, ", ");
-    }
-    fprintf(file, "},\n");
-
-    // Записываем ethertype
-    fprintf(file, "    htons(%u)},\n", tcpPacket->ethernet_header.ethertype);
-
-    // Продолжите запись для остальных полей структур
-
-    fclose(file);
-    printf("Файл %s успешно создан.\n", output_file);
+    // Заполняем TCP-заголовок
+    tcpPacket.tcp_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.tcp_header), sizeof(TCPHeader) + tcpPacket.payload_size));
 }
 
 void manager(const u_char *receivedPacket) {
-    // Пример использования
+    TCPPacket tcpPacket;
+    std::memcpy(&tcpPacket, receivedPacket, sizeof(TCPPacket));
 
-    struct TCPPacket tcpPacket;
-    fill_tcp_packet(&tcpPacket, receivedPacket);
+    // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
+    std::ifstream inputTemplate("src/tcp_sample.cpp");
+    std::ofstream outputResult("src/tcp_result.cpp");
 
-    fill_values_in_file(&tcpPacket, "src/tcp_result.cpp");
+    if (!inputTemplate || !outputResult) {
+        std::cerr << "Не удалось открыть файлы tcp_sample.cpp или tcp_result.cpp\n";
+        return;
+    }
 
+    outputResult << inputTemplate.rdbuf();
+
+    inputTemplate.close();
+    outputResult.close();
+    // Заполняем пустые поля в файла tcp_result.cpp
+    fillPacket(tcpPacket);
+    fillFields(tcpPacket, "src/tcp_result.cpp");
+
+    std::cout << "Программа успешно выполнена\n";
+}
+
+// Функция для вычисления контрольной суммы
+uint16_t pcap_in_cksum(unsigned short *addr, int len) {
+    int nleft = len;
+    int sum = 0;
+    unsigned short *w = addr;
+    unsigned short answer = 0;
+
+    while (nleft > 1) {
+        sum += *w++;
+        nleft -= 2;
+    }
+
+    if (nleft == 1) {
+        *(unsigned char *)(&answer) = *(unsigned char *)w;
+        sum += answer;
+    }
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    answer = ~sum;
+
+    return answer;
 }
