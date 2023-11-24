@@ -45,7 +45,6 @@ int traffic_parser(const char *path_to_traffic) {
     while ((packetData = pcap_next(handle, &header))) {
         if (header.caplen >= 14) {
             const uint16_t etherType = (packetData[12] << 8) | packetData[13];
-            packets.push_back(packetData);
             if (etherType == 0x0800) {
                 IPHeader *ipHeader = (IPHeader *)(packetData + 14);
                 printIPHeader(ipHeader);
@@ -53,6 +52,7 @@ int traffic_parser(const char *path_to_traffic) {
                 if (ipHeader->ip_p == 6) {
                     TCPHeader *tcpHeader = (TCPHeader *)(packetData + 14 + ((ipHeader->ip_vhl & 0x0F) << 2));
                     printTCPHeader(tcpHeader);
+                    manager(packetData);
                 } else if (ipHeader->ip_p == 17) {
                     UDPHeader *udpHeader = (UDPHeader *)(packetData + 14 + ((ipHeader->ip_vhl & 0x0F) << 2));
                     printUDPHeader(udpHeader);
@@ -63,8 +63,6 @@ int traffic_parser(const char *path_to_traffic) {
 
     pcap_close(handle);
 
-    // Передаем вектор всех TCP заголовков для дополнения шаблона
-    manage(packets);
 
     return 0;
 }

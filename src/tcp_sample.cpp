@@ -10,36 +10,36 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
 // Структура для Ethernet-заголовка
 struct EthernetHeader {
-    uint8_t dest_mac[ETH_ALEN] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55}; // Указать реальный MAC-адрес получателя
-    uint8_t src_mac[ETH_ALEN] = {0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB};   // Указать реальный MAC-адрес отправителя
-    uint16_t ethertype = htons(ETHERTYPE_IP);                           // IPv4 Ethertype
+    uint8_t dest_mac[ETH_ALEN] = {, , , , , }; // Указать реальный MAC-адрес получателя
+    uint8_t src_mac[ETH_ALEN] = {, , , , , };   // Указать реальный MAC-адрес отправителя
+    uint16_t ethertype = htons();                           // IPv4 Ethertype
 };
 
 // Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl = 0x45; // IPv4, Header Length (5 words)
-    uint8_t tos = 0;            // Type of Service
-    uint16_t tot_len = 0;       // Total Length (will be filled later)
-    uint16_t id = htons(0x1234); // Identification
-    uint16_t frag_off = 0;       // Fragment Offset
-    uint8_t ttl = 128;           // Time to Live
-    uint8_t protocol = IPPROTO_TCP; // TCP protocol
-    uint16_t check = 0;          // Checksum (will be filled later)
+    uint8_t version_ihl = ; // IPv4, Header Length (5 words)
+    uint8_t tos = ;            // Type of Service
+    uint16_t tot_len = ;       // Total Length (will be filled later)
+    uint16_t id = htons(); // Identification
+    uint16_t frag_off = ;       // Fragment Offset
+    uint8_t ttl = ;           // Time to Live
+    uint8_t protocol = ; // TCP protocol
+    uint16_t check = ;          // Checksum (will be filled later)
     in_addr saddr = {};          // Source IP Address (will be filled later)
     in_addr daddr = {};          // Destination IP Address (will be filled later)
 };
 
 // Структура для TCP-заголовка
 struct TCPHeader {
-    uint16_t source = htons(12345);   // Source Port
-    uint16_t dest = htons(80);        // Destination Port
-    uint32_t seq = htonl(1);          // Sequence Number
-    uint32_t ack_seq = 0;             // Acknowledgment Number
-    uint8_t doff_reserved = (5 << 4); // Data Offset (5 words), Reserved
-    uint8_t flags = TH_SYN;           // SYN flag
-    uint16_t window = htons(14600);   // Window
-    uint16_t check = 0;               // Checksum (will be filled later)
-    uint16_t urg_ptr = 0;             // Urgent Pointer
+    uint16_t source = htons();   // Source Port
+    uint16_t dest = htons();        // Destination Port
+    uint32_t seq = htonl();          // Sequence Number
+    uint32_t ack_seq = ;             // Acknowledgment Number
+    uint8_t doff_reserved = (); // Data Offset (5 words), Reserved
+    uint8_t flags = ;           // SYN flag
+    uint16_t window = htons();   // Window
+    uint16_t check = ;               // Checksum (will be filled later)
+    uint16_t urg_ptr = ;             // Urgent Pointer
 };
 
 // Структура для TCP-пакета
@@ -47,7 +47,7 @@ struct TCPPacket {
     EthernetHeader ethernet_header;
     IPHeader ip_header;
     TCPHeader tcp_header;
-    const char *payload = "Hello, World!"; // Payload
+    const char *payload = ""; // Payload
     size_t payload_size = std::strlen(payload);
 };
 

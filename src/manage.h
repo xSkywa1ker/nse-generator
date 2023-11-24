@@ -4,6 +4,6 @@
 
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue);
 
-int manage(const std::vector<std::vector<unsigned char*>> allPackets);
+void manager(const u_char *receivedPacket);
 
 #endif //LUA_SCRIPT_GENERATOR_MANAGE_H
