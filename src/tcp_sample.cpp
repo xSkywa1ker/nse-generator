@@ -17,7 +17,7 @@ struct EthernetHeader {
 
 // Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl = ; // IPv4, Header Length (5 words)
+    uint8_t version_ihl =     ; // IPv4, Header Length (5 words)
     uint8_t tos = ;            // Type of Service
     uint16_t tot_len = ;       // Total Length (will be filled later)
     uint16_t id = htons(); // Identification

@@ -79,10 +79,106 @@ void fillFields(const TCPPacket& tcpPacket, const std::string& outputFile) {
             output << "};\n";
         } else if ((pos = line.find("ethertype")) != std::string::npos) {
             pos = line.find("( ");
-
             output  << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ethernet_header.ethertype);
             output << line.substr(pos + 1, pos + 2);
-            }
+            output << ";\n";
+            } else if ((pos = line.find("version_ihl")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.version_ihl);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("tos")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.tos);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("tot_len")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.tot_len);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("id")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.id);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("frag_off")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.frag_off);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("ttl")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.ttl);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("protocol")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.protocol);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("check")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ip_header.check);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("saddr")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << " { .s_addr = " << tcpPacket.ip_header.saddr.s_addr << " };\n";
+        } else if ((pos = line.find("daddr")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << " { .s_addr = " << tcpPacket.ip_header.daddr.s_addr << " };\n";
+        } else if ((pos = line.find("source")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.source);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("dest")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.dest);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("seq")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.seq);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("ack_seq")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.ack_seq);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("doff_reserved")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.doff_reserved);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("flags")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.flags);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("window")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.window);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("check")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.check);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("urg_ptr")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.tcp_header.urg_ptr);
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        } else if ((pos = line.find("payload_size")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << tcpPacket.payload_size;
+            output << line.substr(pos + 1, pos + 2);
+            output << ";\n";
+        }
             // Добавьте аналогичные блоки для других полей
 
         else {
