@@ -10,9 +10,8 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
 // Структура для Ethernet-заголовка
 struct EthernetHeader {
-    uint8_t dest_mac[ETH_ALEN] = {, , , , , }; // Указать реальный MAC-адрес получателя
-   uint_8_t dest_mac[ETH_ALEN] = {0, 12, 41, 251, 130, 202};
-ть реальный MAC-адрес отправителя
+    uint8_t dest_mac[ETH_ALEN] = {0, 12, 41, 251, 130, 202};
+    uint8_t src_mac[ETH_ALEN] = {0, 12, 41, 163, 30, 62};
     uint16_t ethertype = htons();                           // IPv4 Ethertype
 };
 

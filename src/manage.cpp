@@ -48,41 +48,48 @@ struct TCPPacket {
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
 void fillFields(const TCPPacket& tcpPacket, const std::string& outputFile) {
-    std::fstream output(outputFile, std::ios::in | std::ios::out); // Открываем файл для чтения и записи
+    std::ifstream input(outputFile);
+    std::ofstream output(outputFile + "_temp");
 
-    if (!output) {
-        std::cerr << "Не удалось открыть файл tcp_result.cpp\n";
+    if (!input || !output) {
+        std::cerr << "Не удалось открыть файл для чтения или записи\n";
         return;
     }
 
     std::string line;
-    std::streampos lastPos = 0;
+    size_t pos;  // Позиция знака равно
 
-    while (std::getline(output, line)) {
-        lastPos = output.tellg();  // Запоминаем текущую позицию в файле
-
+    while (std::getline(input, line)) {
         // Ищем строки, в которых нужно заполнить поля
-        if (line.find("{") != std::string::npos) {
-            output.seekp(lastPos);  // Возвращаемся на последнюю позицию
-            output << "{";
+        if ((pos = line.find("dest_mac")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << " {";
             for (int i = 0; i < ETH_ALEN; ++i) {
                 output << static_cast<int>(tcpPacket.ethernet_header.dest_mac[i]);
                 if (i < ETH_ALEN - 1) output << ", ";
             }
             output << "};\n";
-        } else if (line.find("tcpPacket.ethernet_header.src_mac") != std::string::npos) {
-            output.seekp(lastPos);  // Возвращаемся на последнюю позицию
-            output << "    tcpPacket.ethernet_header.src_mac = {";
+        } else if ((pos = line.find("src_mac")) != std::string::npos) {
+            pos = line.find('=');
+            output << line.substr(0, pos + 1) << " {";
             for (int i = 0; i < ETH_ALEN; ++i) {
                 output << static_cast<int>(tcpPacket.ethernet_header.src_mac[i]);
                 if (i < ETH_ALEN - 1) output << ", ";
             }
             output << "};\n";
         }
-        // Добавьте аналогичные блоки для других полей
+            // Добавьте аналогичные блоки для других полей
+
+        else {
+            output << line << '\n';
+        }
     }
 
+    input.close();
     output.close();
+
+    std::remove(outputFile.c_str());
+    std::rename((outputFile + "_temp").c_str(), outputFile.c_str());
 }
 
 void fillPacket(TCPPacket& tcpPacket) {
