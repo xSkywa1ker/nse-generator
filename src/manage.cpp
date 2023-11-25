@@ -77,7 +77,12 @@ void fillFields(const TCPPacket& tcpPacket, const std::string& outputFile) {
                 if (i < ETH_ALEN - 1) output << ", ";
             }
             output << "};\n";
-        }
+        } else if ((pos = line.find("ethertype")) != std::string::npos) {
+            pos = line.find("( ");
+
+            output  << line.substr(0, pos + 1) << static_cast<int>(tcpPacket.ethernet_header.ethertype);
+            output << line.substr(pos + 1, pos + 2);
+            }
             // Добавьте аналогичные блоки для других полей
 
         else {

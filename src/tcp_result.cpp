@@ -12,8 +12,7 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len);
 struct EthernetHeader {
     uint8_t dest_mac[ETH_ALEN] = {0, 12, 41, 251, 130, 202};
     uint8_t src_mac[ETH_ALEN] = {0, 12, 41, 163, 30, 62};
-    uint16_t ethertype = htons();                           // IPv4 Ethertype
-};
+    uint16_t ethertype = htons(8 );};
 
 // Структура для IP-заголовка
 struct IPHeader {
