@@ -10,36 +10,36 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
 // Структура для Ethernet-заголовка
 struct EthernetHeader {
-    uint8_t dest_mac[ETH_ALEN] = {0, 12, 41, 251, 130, 202};
-    uint8_t src_mac[ETH_ALEN] = {0, 12, 41, 163, 30, 62};
-    uint16_t ethertype = htons(8 );;
+    uint8_t dest_mac[ETH_ALEN] = {0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca};
+    uint8_t src_mac[ETH_ALEN] = {0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca};
+    uint16_t ethertype =0x0008 ;
 };
 
 // Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl =0     ; // IPv4, Header Len;
-    uint8_t tos =40 ;            // T;
-    uint16_t tot_len =11266 ;       // Total Lengt;
-    uint16_t id =64 htons(); // Ident;
-    uint16_t frag_off =1664 ;       // Fragment Off;
-    uint8_t ttl =0 ;           // Ti;
-    uint8_t protocol =0 ; // TCP protocol;
-    uint16_t check =44626 ;          // Checks;
-    in_addr saddr = { .s_addr = 4272500298 };
-    in_addr daddr = { .s_addr = 2764997154 };
+    uint8_t version_ihl =0x69 ;
+    uint8_t tos =0x00 ;
+    uint16_t tot_len = 0;
+    uint16_t id = htons(0x00 );
+    uint16_t frag_off =0x64 ;
+    uint8_t ttl =128 ;
+    uint8_t protocol =6 ;
+    uint16_t check = 0;
+    in_addr saddr = {};
+    in_addr daddr = {};
 };
 
 // Структура для TCP-заголовка
 struct TCPHeader {
-    uint16_t source =35584 htons();   // Source ;
-    uint16_t dest =34986 htons();        // ;
-    uint32_t seq =1144455935 htonl();          ;
-    uint32_t ack_seq =1144455935 ;             // Ackno;
-    uint8_t doff_reserved =0 (); // Data Offset (5 words;
-    uint8_t flags =0 ;           // SYN ;
-    uint16_t window =51136 htons();   // Window;
-    uint16_t check =44626 ;               // C;
-    uint16_t urg_ptr =0 ;             // Urgen;
+    uint16_t source =0x42190 ;
+    uint16_t dest =0x35584 ;
+    uint32_t seq =0x50301098 ;
+    uint32_t ack_seq =0x50301098 ;
+    uint8_t doff_reserved = (0x00 );
+    uint8_t flags =0x20 ;
+    uint16_t window =0x00 ;
+    uint16_t check = 0;
+    uint16_t urg_ptr =0x00 ;
 };
 
 // Структура для TCP-пакета
@@ -47,23 +47,23 @@ struct TCPPacket {
     EthernetHeader ethernet_header;
     IPHeader ip_header;
     TCPHeader tcp_header;
-    const char *payload = ""; // Payload
-    size_t payload_size =429496730116 std::strlen(payload);;
+    const char *payload = " "; // Payload
+    size_t payload_size = std::strlen(payload);
 };
 
 // Функция для отправки TCP-пакета
-64v;
+void send_tcp_packet() {
     char errbuf[PCAP_ERRBUF_SIZE];
     TCPPacket tcpPacket;
-    tcpPacket.ip_header.saddr.s_addr = { .s_addr = 4272500298 };
-    tcpPacket.ip_header.daddr.s_addr = { .s_addr = 2764997154 };
+    tcpPacket.ip_header.saddr.s_addr = inet_addr("127.0.0.1");
+    tcpPacket.ip_header.daddr.s_addr = inet_addr("127.0.0.1");
 
     // Заполняем IP-заголовок
-    tcpPacket.ip_header.tot_len =11266 htons(sizeof(IPHeader) + sizeof(T;
-    tcpPacket.ip_header.check =44626 htons(pcap_in_cksum(reinterpret;
+    tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
+    tcpPacket.ip_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.ip_header), sizeof(IPHeader)));
 
     // Заполняем TCP-заголовок
-    tcpPacket.tcp_header.check =44626 htons(pcap_in_cksum(reinterpret_;
+    tcpPacket.tcp_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.tcp_header), sizeof(TCPHeader) + tcpPacket.payload_size));
 
     // Открываем сессию pcap для отправки
     pcap_t *send_handle = pcap_open_live("lo", BUFSIZ, 0, 1000, errbuf);
@@ -73,7 +73,7 @@ struct TCPPacket {
     }
 
     // Создаем буфер для сырых данных пакета
-429496730116 ;
+    uint8_t buffer[sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size];
 
     // Копируем данные Ethernet-заголовка
     std::memcpy(buffer, &tcpPacket.ethernet_header, sizeof(EthernetHeader));
@@ -85,7 +85,7 @@ struct TCPPacket {
     std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader), &tcpPacket.tcp_header, sizeof(TCPHeader));
 
     // Копируем данные payload
-429496730116 ;
+    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader), tcpPacket.payload, tcpPacket.payload_size);
 
     // Отправляем пакет
     if (pcap_sendpacket(send_handle, buffer, sizeof(buffer)) != 0) {

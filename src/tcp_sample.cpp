@@ -10,36 +10,36 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
 // Структура для Ethernet-заголовка
 struct EthernetHeader {
-    uint8_t dest_mac[ETH_ALEN] = {, , , , , }; // Указать реальный MAC-адрес получателя
-    uint8_t src_mac[ETH_ALEN] = {, , , , , };   // Указать реальный MAC-адрес отправителя
-    uint16_t ethertype = htons( );
+    uint8_t dest_mac[ETH_ALEN] = {, , , , , };
+    uint8_t src_mac[ETH_ALEN] = {, , , , , };
+    uint16_t ethertype = ;
 };
 
 // Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl =     ; // IPv4, Header Length (5 words)
-    uint8_t tos = ;            // Type of Service
-    uint16_t tot_len = ;       // Total Length (will be filled later)
-    uint16_t id = htons(); // Identification
-    uint16_t frag_off = ;       // Fragment Offset
-    uint8_t ttl = ;           // Time to Live
-    uint8_t protocol = ; // TCP protocol
-    uint16_t check = ;          // Checksum (will be filled later)
-    in_addr saddr = {};          // Source IP Address (will be filled later)
-    in_addr daddr = {};          // Destination IP Address (will be filled later)
+    uint8_t version_ihl = ;
+    uint8_t tos = ;
+    uint16_t tot_len = 0;
+    uint16_t id = htons( );
+    uint16_t frag_off = ;
+    uint8_t ttl = ;
+    uint8_t protocol = ;
+    uint16_t check = 0;
+    in_addr saddr = {};
+    in_addr daddr = {};
 };
 
 // Структура для TCP-заголовка
 struct TCPHeader {
-    uint16_t source = htons();   // Source Port
-    uint16_t dest = htons();        // Destination Port
-    uint32_t seq = htonl();          // Sequence Number
-    uint32_t ack_seq = ;             // Acknowledgment Number
-    uint8_t doff_reserved = (); // Data Offset (5 words), Reserved
-    uint8_t flags = ;           // SYN flag
-    uint16_t window = htons();   // Window
-    uint16_t check = ;               // Checksum (will be filled later)
-    uint16_t urg_ptr = ;             // Urgent Pointer
+    uint16_t source = ;
+    uint16_t dest = ;
+    uint32_t seq = ;
+    uint32_t ack_seq = ;
+    uint8_t doff_reserved = ( );
+    uint8_t flags = ;
+    uint16_t window = ;
+    uint16_t check = 0;
+    uint16_t urg_ptr = ;
 };
 
 // Структура для TCP-пакета
@@ -47,7 +47,7 @@ struct TCPPacket {
     EthernetHeader ethernet_header;
     IPHeader ip_header;
     TCPHeader tcp_header;
-    const char *payload = ""; // Payload
+    const char *payload = " "; // Payload
     size_t payload_size = std::strlen(payload);
 };
 

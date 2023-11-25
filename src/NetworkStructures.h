@@ -5,43 +5,53 @@
 #include <cstdint>
 #include <arpa/inet.h>
 #include <vector>
+#include <netinet/ether.h>
 
-struct EthernetHeader {
-    std::vector<uint8_t> dest_mac;
-    std::vector<uint8_t> src_mac;
-    uint16_t ethertype;
-};
+typedef struct ip_address {
+    u_char byte1;
+    u_char byte2;
+    u_char byte3;
+    u_char byte4;
+} ip_address;
 
-struct IPHeader {
-    uint8_t ip_vhl;
-    uint8_t ip_tos;
-    uint16_t ip_len;
-    uint16_t ip_id;
-    uint16_t ip_off;
-    uint8_t ip_ttl;
-    uint8_t ip_p;
-    uint16_t ip_sum;
-    uint32_t ip_src;
-    uint32_t ip_dst;
-};
+typedef struct ethernet_header {
+    u_char ether_dhost[ETHER_ADDR_LEN]; /* destination host address */
+    u_char ether_shost[ETHER_ADDR_LEN]; /* source host address */
+    u_short ether_type;
+} ethernet_header;
 
-struct TCPHeader {
-    uint16_t th_sport;
-    uint16_t th_dport;
-    uint32_t th_seq;
-    uint32_t th_ack;
-    uint8_t th_offx2;
-    uint8_t th_flags;
-    uint16_t th_win;
-    uint16_t th_sum;
-    uint16_t th_urp;
-};
+typedef struct ip_header {
+    u_char ver_ihl;        // Version (4 bits) + Internet header length (4 bits)
+    u_char tos;            // Type of service
+    u_short tlen;           // Total length
+    u_short identification; // Identification
+    u_short flags_fo;       // Flags (3 bits) + Fragment offset (13 bits)
+    u_char ttl;            // Time to live
+    u_char proto;          // Protocol
+    u_short crc;            // Header checksum
+    ip_address saddr;      // Source address
+    ip_address daddr;      // Destination address
+} ip_header;
 
-struct UDPHeader {
-    uint16_t uh_sport;
-    uint16_t uh_dport;
-    uint16_t uh_ulen;
-    uint16_t uh_sum;
-};
+typedef u_int32_t tcp_seq;
+
+typedef struct tcp_header {
+    u_short sport;          // Source port
+    u_short dport;          // Destination port
+    tcp_seq th_seq;
+    tcp_seq th_ack;
+    u_char th_offx2;
+    u_char th_flags;
+    u_short th_win;        /* window */
+    u_short th_sum;        /* checksum */
+    u_short th_urp;        /* urgent pointer */
+} tcp_header;
+
+typedef struct udp_header {
+    u_short sport;          // Source port
+    u_short dport;          // Destination port
+    u_short len;            // Datagram length
+    u_short crc;            // Checksum
+} udp_header;
 
 #endif
