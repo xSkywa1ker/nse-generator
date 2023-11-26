@@ -17,11 +17,11 @@ struct EthernetHeader {
 
 // Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl =0x69 ;
-    uint8_t tos =0x00 ;
+    uint8_t version_ihl =69 ;
+    uint8_t tos =0 ;
     uint16_t tot_len = 0;
-    uint16_t id = htons(0x00 );
-    uint16_t frag_off =0x64 ;
+    uint16_t id = htons(0 );
+    uint16_t frag_off =64 ;
     uint8_t ttl =128 ;
     uint8_t protocol =6 ;
     uint16_t check = 0;
@@ -31,15 +31,15 @@ struct IPHeader {
 
 // Структура для TCP-заголовка
 struct TCPHeader {
-    uint16_t source =0x42190 ;
-    uint16_t dest =0x35584 ;
-    uint32_t seq =0x50301098 ;
-    uint32_t ack_seq =0x50301098 ;
-    uint8_t doff_reserved = (0x00 );
-    uint8_t flags =0x20 ;
-    uint16_t window =0x00 ;
+    uint16_t source =52900 ;
+    uint16_t dest =139 ;
+    uint32_t seq =43656 ;
+    uint32_t ack =0 ;
+    uint8_t doff_reserved = (0 );
+    uint8_t flags =20 ;
+    uint16_t window =0 ;
     uint16_t check = 0;
-    uint16_t urg_ptr =0x00 ;
+    uint16_t urg_ptr =0 ;
 };
 
 // Структура для TCP-пакета

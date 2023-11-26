@@ -6,6 +6,7 @@
 #include <netinet/ether.h>
 #include <arpa/inet.h>
 #include <iomanip>
+#include <cmath>
 
 #define MAX_PACKET_LIFETIME 120 // Максимальное время жизни пакета в секундах
 #define MAX_PACKET_SIZE 65535   // Максимальная длина пакета
@@ -57,6 +58,7 @@ typedef struct tcp_header {
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 std::string getValue(const std::string &line, const ethernet_header &eth, const ip_header &iph, const tcp_header &th);
+int HEX_TO_DEC(std::string st);
 
 void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile) {
     std::ifstream input(outputFile);
@@ -95,18 +97,18 @@ void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_head
                    (pos = line.find("source")) != std::string::npos ||
                    (pos = line.find("dest")) != std::string::npos ||
                    (pos = line.find("seq")) != std::string::npos ||
-                   (pos = line.find("ack_seq")) != std::string::npos ||
+                   (pos = line.find("ack ")) != std::string::npos ||
                    (pos = line.find("doff_reserved")) != std::string::npos ||
                    (pos = line.find("flags")) != std::string::npos ||
                    (pos = line.find("window")) != std::string::npos ||
                    (pos = line.find("urg_ptr")) != std::string::npos) {
             pos = line.find("( ") < 1000 ? line.find("( ") : line.find('=');
-            output << line.substr(0, pos + 1) << "0x" << std::hex << std::setw(2) << std::setfill('0');
+            output << line.substr(0, pos + 1);
             if (pos == line.find("urg_ptr")) {
                 // For urg_ptr field, use 4 digits
                 output << std::setw(4);
             }
-            output << getValue(line, eth, iph, th);
+            output << HEX_TO_DEC(getValue(line, eth, iph, th));
             output << line.substr(pos + 1, pos + 2);
             output << "\n";
         } else if ((pos = line.find("ttl") != std::string::npos) || (pos = line.find("protocol") != std::string::npos)) {
@@ -138,7 +140,9 @@ void fillPacket(ip_header &iph, tcp_header &th) {
 
     std::cout << "IP Header Version: " << std::hex << ((iph.ver_ihl & 0xF0) >> 4) << std::endl;
     std::cout << "IP Header IHL: " << std::hex << (iph.ver_ihl & 0x0F) << std::endl;
-    std::cout << "TCP Header Sport: " << th.sport << std::endl;
+    std::cout << "TCP Header Sport: " << htons(th.sport) << std::endl;
+    std::cout << "TCP Header Dport: " << htons(th.dport) << std::endl;
+    std::cout << "TCP Header flags: " << th.th_flags << std::endl;
 }
 
 void manager(const u_char *receivedPacket) {
@@ -146,8 +150,20 @@ void manager(const u_char *receivedPacket) {
     ip_header *ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6) {
         tcp_header *tcp_hdr = (tcp_header *)((u_char *)ip_hdr + (ip_hdr->ver_ihl & 0x0F) * 4);
+        // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
+        std::ifstream inputTemplate("src/tcp_sample.cpp");
+        std::ofstream outputResult("src/tcp_result.cpp");
+
+        if (!inputTemplate || !outputResult) {
+            std::cerr << "Не удалось открыть файлы tcp_sample.cpp или tcp_result.cpp\n";
+            return;
+        }
+
+        outputResult << inputTemplate.rdbuf();
+
+        inputTemplate.close();
+        outputResult.close();
         fillPacket(*ip_hdr, *tcp_hdr);
-        std::cout << "TCP Header Sport: " << tcp_hdr->sport << std::endl;
         fillFields(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
     }
 
@@ -226,4 +242,37 @@ std::string getValue(const std::string &line, const ethernet_header &eth, const 
         }
     }
     return "";
+}
+
+int HEX_TO_DEC(std::string st)
+{
+    int i,s,k,p;
+    s=0;
+    p=st.length()-1;
+    for (i=0; st[i]!='\0'; i++)
+    {
+        switch (toupper(st[i]))
+        {
+            case 'a': k=10; break;
+            case 'b': k=11; break;
+            case 'c': k=12; break;
+            case 'd': k=13; break;
+            case 'e': k=14; break;
+            case 'f': k=15; break;
+            case '1': k=1; break;
+            case '2': k=2; break;
+            case '3': k=3; break;
+            case '4': k=4; break;
+            case '5': k=5; break;
+            case '6': k=6; break;
+            case '7': k=7; break;
+            case '8': k=8; break;
+            case '9': k=9; break;
+            case '0': k=0; break;
+        }
+        s=s+k*pow(16,p);
+        p--;
+    }
+    std::cout  <<s << std::endl;
+    return s;
 }

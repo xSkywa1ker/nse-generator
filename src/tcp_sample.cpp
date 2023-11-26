@@ -34,7 +34,7 @@ struct TCPHeader {
     uint16_t source = ;
     uint16_t dest = ;
     uint32_t seq = ;
-    uint32_t ack_seq = ;
+    uint32_t ack = ;
     uint8_t doff_reserved = ( );
     uint8_t flags = ;
     uint16_t window = ;
