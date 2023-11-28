@@ -6,8 +6,8 @@
 int traffic_parser(const char* path_to_traffic);
 
 #endif
-void printIPHeader(const IPHeader* ipHeader);
+void printIPHeader(const ip_header* ipHeader);
 
-void printTCPHeader(const TCPHeader* tcpHeader);
+void printTCPHeader(const tcp_header* tcpHeader);
 
-void printUDPHeader(const UDPHeader* udpHeader);
+void printUDPHeader(const udp_header* udpHeader);
