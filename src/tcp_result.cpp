@@ -35,7 +35,7 @@ struct TCPHeader {
     uint16_t dest =139 ;
     uint32_t seq =43656 ;
     uint32_t ack =0 ;
-    uint8_t doff_reserved = (0 );
+    uint8_t doff_reserved = 80;
     uint8_t flags =20 ;
     uint16_t window =0 ;
     uint16_t check = 0;
@@ -60,10 +60,13 @@ void send_tcp_packet() {
 
     // Заполняем IP-заголовок
     tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
+    std::cout << "Total len TCP: " << tcpPacket.ip_header.tot_len << std::endl;
     tcpPacket.ip_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.ip_header), sizeof(IPHeader)));
-
+    std::cout << "IP CheckSum: " << tcpPacket.ip_header.check << std::endl;
     // Заполняем TCP-заголовок
+    std::cout << "TCP DO: " << tcpPacket.tcp_header.doff_reserved << std::endl;
     tcpPacket.tcp_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.tcp_header), sizeof(TCPHeader) + tcpPacket.payload_size));
+    std::cout << "TCP CheckSum: " << tcpPacket.tcp_header.check << std::endl;
 
     // Открываем сессию pcap для отправки
     pcap_t *send_handle = pcap_open_live("lo", BUFSIZ, 0, 1000, errbuf);
