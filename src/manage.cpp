@@ -89,8 +89,15 @@ void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_head
                  HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
                  HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), HEX_TO_DEC(std::to_string(th.th_offx2)), HEX_TO_DEC(std::to_string(th.th_flags)),
                  HEX_TO_DEC(std::to_string(th.th_win)), HEX_TO_DEC(std::to_string(th.th_urp)));
-    var.append(appData);
-    var.append("}\n");
+    // Ищем позицию закрывающей фигурной скобки
+    size_t pos = var.rfind("}");
+
+    if (pos != std::string::npos)
+    {
+        // Вставляем данные перед закрывающей фигурной скобкой
+        var.insert(pos, appData);
+    }
+
     output << var;
     output.close();
 
