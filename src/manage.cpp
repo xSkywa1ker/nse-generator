@@ -120,7 +120,7 @@ void fillPacket(ip_header &iph, tcp_header &th)
     std::cout << "TCP Header flags: " << th.th_flags << std::endl;
 }
 
-void manager(const u_char *receivedPacket)
+void manager(const u_char *receivedPacket, bool is_scanner)
 {
     ethernet_header *eth_hdr = (ethernet_header *)(receivedPacket);
     ip_header *ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);

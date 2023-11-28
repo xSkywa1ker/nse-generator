@@ -6,7 +6,7 @@
 #include "manage.h"
 #include <arpa/inet.h>
 
-int traffic_parser(const char *path_to_traffic) {
+int traffic_parser(const char *path_to_traffic, const char *ip_scanner,const char *ip_victim) {
     const char *pcapFile = path_to_traffic;
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *handle = pcap_open_offline(pcapFile, errbuf);
@@ -27,7 +27,12 @@ int traffic_parser(const char *path_to_traffic) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);
                 if (ipHeader->proto == 6) {
                     tcp_header *tcpHeader = (tcp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
-                    manager(packetData);
+                    if (ipHeader->saddr == ip_scanner) {
+                        manager(packetData, true);
+                    }
+                    else if (ipHeader->saddr == ip_victim){
+                        manager(packetData, false);
+                    }
                 } else if (ipHeader->proto == 17) {
                     udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
                 }
