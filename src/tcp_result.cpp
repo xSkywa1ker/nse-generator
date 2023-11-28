@@ -10,36 +10,36 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len);
 
 // Структура для Ethernet-заголовка
 struct EthernetHeader {
-    uint8_t dest_mac[ETH_ALEN] = {0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca};
-    uint8_t src_mac[ETH_ALEN] = {0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca};
-    uint16_t ethertype =0x0008 ;
+    uint8_t dest_mac[ETH_ALEN];
+    uint8_t src_mac[ETH_ALEN];
+    uint16_t ethertype;
 };
 
 // Структура для IP-заголовка
 struct IPHeader {
-    uint8_t version_ihl =69 ;
-    uint8_t tos =0 ;
-    uint16_t tot_len = 0;
-    uint16_t id = htons(0 );
-    uint16_t frag_off =64 ;
-    uint8_t ttl =128 ;
-    uint8_t protocol =6 ;
-    uint16_t check = 0;
-    in_addr saddr = {};
-    in_addr daddr = {};
+    uint8_t version_ihl;
+    uint8_t tos;
+    uint16_t tot_len;
+    uint16_t id;
+    uint16_t frag_off;
+    uint8_t ttl;
+    uint8_t protocol;
+    uint16_t check;
+    in_addr saddr;
+    in_addr daddr;
 };
 
 // Структура для TCP-заголовка
 struct TCPHeader {
-    uint16_t source =52900 ;
-    uint16_t dest =139 ;
-    uint32_t seq =43656 ;
-    uint32_t ack =0 ;
-    uint8_t doff_reserved = 80;
-    uint8_t flags =20 ;
-    uint16_t window =0 ;
-    uint16_t check = 0;
-    uint16_t urg_ptr =0 ;
+    uint16_t source;
+    uint16_t dest;
+    uint32_t seq;
+    uint32_t ack;
+    uint8_t doff_reserved;
+    uint8_t flags;
+    uint16_t window;
+    uint16_t check;
+    uint16_t urg_ptr;
 };
 
 // Структура для TCP-пакета
@@ -52,11 +52,41 @@ struct TCPPacket {
 };
 
 // Функция для отправки TCP-пакета
-void send_tcp_packet() {
+void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer_list<uint8_t> ether_shost,u_short ether_type,
+                     u_char ver_ihl,u_char tos,u_short tlen,u_short identification, u_short flags_fo,u_char ttl,
+                     u_char proto,u_short sport,u_short dport, tcp_seq th_seq,tcp_seq th_ack,u_char th_offx2,
+                     u_char th_flags,u_short th_win, u_short th_urp) {
     char errbuf[PCAP_ERRBUF_SIZE];
     TCPPacket tcpPacket;
+    int i = 0;
+    for (auto value : ether_dhost) {
+        tcpPacket.ethernet_header.dest_mac[i] = value;
+        ++i;
+    }
+
+    i = 0;
+    for (auto value : ether_shost) {
+        tcpPacket.ethernet_header.src_mac[i] = value;
+        ++i;
+    }
+    tcpPacket.ethernet_header.ethertype = ether_type;
+    tcpPacket.ip_header.version_ihl = ver_ihl;
+    tcpPacket.ip_header.tos = tos;
+    tcpPacket.ip_header.tot_len = tlen;
+    tcpPacket.ip_header.id = identification;
+    tcpPacket.ip_header.frag_off = flags_fo;
+    tcpPacket.ip_header.ttl = ttl;
+    tcpPacket.ip_header.protocol = proto;
     tcpPacket.ip_header.saddr.s_addr = inet_addr("127.0.0.1");
     tcpPacket.ip_header.daddr.s_addr = inet_addr("127.0.0.1");
+    tcpPacket.tcp_header.source = sport;
+    tcpPacket.tcp_header.dest = dport;
+    tcpPacket.tcp_header.seq = th_seq;
+    tcpPacket.tcp_header.ack = th_ack;
+    tcpPacket.tcp_header.doff_reserved = th_offx2;
+    tcpPacket.tcp_header.flags = th_flags;
+    tcpPacket.tcp_header.window = th_win;
+    tcpPacket.tcp_header.urg_ptr = th_urp;
 
     // Заполняем IP-заголовок
     tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
@@ -122,7 +152,12 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len) {
 
     return answer;
 }
-
 int main() {
-    send_tcp_packet();
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 28, 19910, 64, 128, 6,52900, 139, 276054, 0, 128, 02, 61690, 00);
+
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e},{0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca}, 0x08, 69, 00, 28, 30797, 64, 128, 6,139, 52900, 82248, 276054, 128, 18, 32, 00);
+
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 28, 20166, 64, 128, 6,52900, 139, 276054, 82248, 80, 16, 5152, 00);
+
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 28, 24262, 64, 128, 6,52900, 139, 276054, 82248, 80, 20, 00, 00);
 }
