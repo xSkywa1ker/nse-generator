@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
+void receive_tcp_response(const char *dev, const char *filter_exp);
 
 // Структура для Ethernet-заголовка
 struct EthernetHeader {
@@ -127,6 +128,49 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
 
     // Закрываем сессию pcap
     pcap_close(send_handle);
+    const char* filt_exp;
+    std::sprintf(filt_exp,"host %c and tcp port %d", tcpPacket.ip_header.daddr, tcpPacket.tcp_header.dest);
+    std::cout << filt_exp;
+    receive_tcp_response("lo", filt_exp);
+}
+
+void receive_tcp_response(const char *dev, const char *filter_exp) {
+    char errbuf[PCAP_ERRBUF_SIZE];
+    // Open the capture session in promiscuous mode
+    pcap_t *recv_handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+    if (recv_handle == nullptr) {
+        std::cerr << "Error opening pcap session for receiving: " << errbuf << std::endl;
+        return;
+    }
+
+    // Set a filter to capture only relevant response packets
+    struct bpf_program fp;
+    if (pcap_compile(recv_handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        std::cerr << "Error compiling filter: " << pcap_geterr(recv_handle) << std::endl;
+        pcap_close(recv_handle);
+        return;
+    }
+    if (pcap_setfilter(recv_handle, &fp) == -1) {
+        std::cerr << "Error setting filter: " << pcap_geterr(recv_handle) << std::endl;
+        pcap_close(recv_handle);
+        return;
+    }
+
+    // Wait for the response packet
+    struct pcap_pkthdr header;
+    const uint8_t *packet;
+    while (true) {
+        packet = pcap_next(recv_handle, &header);
+        if (packet != nullptr) {
+            // Process the response packet as needed
+            // You can parse the packet using the same structure used for sending
+            std::cout << "Received a response packet." << std::endl;
+            break;
+        }
+    }
+
+    // Close the capture session
+    pcap_close(recv_handle);
 }
 
 // Функция для вычисления контрольной суммы
