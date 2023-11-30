@@ -6,7 +6,7 @@
 #include <netinet/ether.h>
 #include <arpa/inet.h>
 
-uint16_t pcap_in_cksum(unsigned short *addr, int len);
+
 void receive_tcp_response(const char *dev, const char *filter_exp);
 
 // Структура для Ethernet-заголовка
@@ -41,6 +41,7 @@ struct TCPHeader {
     uint16_t window;
     uint16_t check;
     uint16_t urg_ptr;
+    char options[12];
 };
 
 // Структура для TCP-пакета
@@ -48,15 +49,18 @@ struct TCPPacket {
     EthernetHeader ethernet_header;
     IPHeader ip_header;
     TCPHeader tcp_header;
-    const char *payload = " "; // Payload
+    const char *payload = ""; // Payload
     size_t payload_size = std::strlen(payload);
 };
+
+uint16_t calculate_ip_checksum(IPHeader *ip_header);
+uint16_t calculate_tcp_checksum(IPHeader *ip_header, TCPHeader *tcp_header, const char *payload, size_t payload_size);
 
 // Функция для отправки TCP-пакета
 void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer_list<uint8_t> ether_shost,u_short ether_type,
                      u_char ver_ihl,u_char tos,u_short tlen,u_short identification, u_short flags_fo,u_char ttl,
                      u_char proto,u_short sport,u_short dport, tcp_seq th_seq,tcp_seq th_ack,u_char th_offx2,
-                     u_char th_flags,u_short th_win, u_short th_urp) {
+                     u_char th_flags,u_short th_win, u_short th_urp, const char *options, size_t options_size) {
     char errbuf[PCAP_ERRBUF_SIZE];
     TCPPacket tcpPacket;
     int i = 0;
@@ -78,13 +82,13 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
     tcpPacket.ip_header.frag_off = flags_fo;
     tcpPacket.ip_header.ttl = ttl;
     tcpPacket.ip_header.protocol = proto;
-    tcpPacket.ip_header.saddr.s_addr = inet_addr("127.0.0.1");
-    tcpPacket.ip_header.daddr.s_addr = inet_addr("127.0.0.1");
-    tcpPacket.tcp_header.source = sport;
-    tcpPacket.tcp_header.dest = dport;
+    tcpPacket.ip_header.saddr.s_addr = inet_addr("192.168.3.11");
+    tcpPacket.ip_header.daddr.s_addr = inet_addr("192.168.3.10");
+    tcpPacket.tcp_header.source = htons(sport);
+    tcpPacket.tcp_header.dest = htons(dport);
     tcpPacket.tcp_header.seq = th_seq;
     tcpPacket.tcp_header.ack = th_ack;
-    tcpPacket.tcp_header.doff_reserved = th_offx2;
+    tcpPacket.tcp_header.doff_reserved = ((sizeof(TCPHeader) / 4) << 4) | 0;;
     tcpPacket.tcp_header.flags = th_flags;
     tcpPacket.tcp_header.window = th_win;
     tcpPacket.tcp_header.urg_ptr = th_urp;
@@ -92,15 +96,15 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
     // Заполняем IP-заголовок
     tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
     std::cout << "Total len TCP: " << tcpPacket.ip_header.tot_len << std::endl;
-    tcpPacket.ip_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.ip_header), sizeof(IPHeader)));
+    tcpPacket.ip_header.check = htons(calculate_ip_checksum(&tcpPacket.ip_header));
     std::cout << "IP CheckSum: " << tcpPacket.ip_header.check << std::endl;
     // Заполняем TCP-заголовок
-    std::cout << "TCP DO: " << tcpPacket.tcp_header.doff_reserved << std::endl;
-    tcpPacket.tcp_header.check = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&tcpPacket.tcp_header), sizeof(TCPHeader) + tcpPacket.payload_size));
+    std::cout << "TCP DO: " << ntohs(tcpPacket.tcp_header.doff_reserved) << std::endl;
+    tcpPacket.tcp_header.check = htons(calculate_tcp_checksum(&tcpPacket.ip_header,&tcpPacket.tcp_header, tcpPacket.payload , tcpPacket.payload_size));
     std::cout << "TCP CheckSum: " << tcpPacket.tcp_header.check << std::endl;
 
     // Открываем сессию pcap для отправки
-    pcap_t *send_handle = pcap_open_live("lo", BUFSIZ, 0, 1000, errbuf);
+    pcap_t *send_handle = pcap_open_live("ens35", BUFSIZ, 0, 1000, errbuf);
     if (send_handle == nullptr) {
         std::cerr << "Ошибка при открытии сессии pcap: " << errbuf << std::endl;
         return;
@@ -118,6 +122,9 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
     // Копируем данные TCP-заголовка
     std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader), &tcpPacket.tcp_header, sizeof(TCPHeader));
 
+    // Добавляем опции
+    std::memcpy(tcpPacket.tcp_header.options, options, options_size);
+
     // Копируем данные payload
     std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader), tcpPacket.payload, tcpPacket.payload_size);
 
@@ -128,13 +135,14 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
 
     // Закрываем сессию pcap
     pcap_close(send_handle);
-    const char* filt_exp;
-    std::sprintf(filt_exp,"host %c and tcp port %d", tcpPacket.ip_header.daddr, tcpPacket.tcp_header.dest);
+    char filt_exp[40] = "";
+    std::sprintf(filt_exp,"host %s and tcp port %d\n", inet_ntoa(tcpPacket.ip_header.daddr), ntohs(tcpPacket.tcp_header.dest));
     std::cout << filt_exp;
-    receive_tcp_response("lo", filt_exp);
+    receive_tcp_response("ens35", filt_exp);
 }
 
 void receive_tcp_response(const char *dev, const char *filter_exp) {
+    std::cout << "Waiting for response..." << std::endl;
     char errbuf[PCAP_ERRBUF_SIZE];
     // Open the capture session in promiscuous mode
     pcap_t *recv_handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
@@ -173,26 +181,66 @@ void receive_tcp_response(const char *dev, const char *filter_exp) {
     pcap_close(recv_handle);
 }
 
-// Функция для вычисления контрольной суммы
-uint16_t pcap_in_cksum(unsigned short *addr, int len) {
-    int nleft = len;
+// Функция для вычисления контрольной суммы IP-заголовка
+uint16_t calculate_ip_checksum(IPHeader *ip_header) {
+    int len = sizeof(IPHeader);
+    uint16_t *addr = reinterpret_cast<uint16_t *>(ip_header);
+
     int sum = 0;
-    unsigned short *w = addr;
-    unsigned short answer = 0;
-
-    while (nleft > 1) {
-        sum += *w++;
-        nleft -= 2;
+    while (len > 1) {
+        sum += *addr++;
+        len -= 2;
     }
 
-    if (nleft == 1) {
-        *(unsigned char *)(&answer) = *(unsigned char *)w;
-        sum += answer;
+    // Добавляем последний байт, если длина нечетная
+    if (len == 1) {
+        sum += *reinterpret_cast<uint8_t *>(addr);
     }
 
+    // Добавляем переносы
     sum = (sum >> 16) + (sum & 0xFFFF);
     sum += (sum >> 16);
-    answer = ~sum;
 
-    return answer;
+    // Инвертируем результат
+    return static_cast<uint16_t>(~sum);
+}
+
+// Функция для вычисления контрольной суммы TCP-заголовка
+uint16_t calculate_tcp_checksum(IPHeader *ip_header, TCPHeader *tcp_header, const char *payload, size_t payload_size) {
+    int len = sizeof(IPHeader) + sizeof(TCPHeader) + payload_size;
+    uint16_t *addr = reinterpret_cast<uint16_t *>(ip_header);
+
+    int sum = 0;
+    while (len > 1) {
+        sum += ntohs(*addr++);
+        len -= 2;
+    }
+
+    // Добавляем TCP псевдозаголовок (для расчета контрольной суммы TCP)
+    sum += ntohs(ip_header->saddr.s_addr >> 16);
+    sum += ntohs(ip_header->saddr.s_addr & 0xFFFF);
+    sum += ntohs(ip_header->daddr.s_addr >> 16);
+    sum += ntohs(ip_header->daddr.s_addr & 0xFFFF);
+    sum += htons(IPPROTO_TCP);
+    sum += htons(sizeof(TCPHeader) + payload_size);
+
+    // Добавляем данные TCP-заголовка и полезной нагрузки
+    addr = reinterpret_cast<uint16_t *>(tcp_header);
+    len = sizeof(TCPHeader) + payload_size;
+    while (len > 1) {
+        sum += ntohs(*addr++);
+        len -= 2;
+    }
+
+    // Добавляем последний байт, если длина нечетная
+    if (len == 1) {
+        sum += *reinterpret_cast<uint8_t *>(addr);
+    }
+
+    // Добавляем переносы
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+
+    // Инвертируем результат
+    return static_cast<uint16_t>(~sum);
 }

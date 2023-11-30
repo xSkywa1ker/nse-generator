@@ -58,6 +58,7 @@ typedef struct tcp_header
     u_short th_win; /* window */
     u_short th_sum; /* checksum */
     u_short th_urp; /* urgent pointer */
+    char options[12];
 } tcp_header;
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
@@ -79,7 +80,7 @@ void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_head
 
     std::sprintf(appData, "\tsend_tcp_packet({0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x},{0x%02x, 0x%02x, "
                           "0x%02x, 0x%02x, 0x%02x, 0x%02x}, 0x%02x, %02x, %02x, %02x, "
-                          "%02x, %02x, %d, %d,%02x, %02x, %d, %d, %02x, %02x, %02x, %02x);\n",
+                          "%02x, %02x, %d, %d,%02x, %02x, %d, %d, %02x, %02x, %02x, %02x, \"%s\", %lu);\n",
                  eth.ether_dhost[0], eth.ether_dhost[1], eth.ether_dhost[2], eth.ether_dhost[3],
                  eth.ether_dhost[4], eth.ether_dhost[5], eth.ether_shost[0], eth.ether_shost[1],
                  eth.ether_shost[2], eth.ether_shost[3], eth.ether_shost[4], eth.ether_shost[5],
@@ -88,7 +89,8 @@ void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_head
                  HEX_TO_DEC(std::to_string(iph.flags_fo)), iph.ttl, iph.proto, HEX_TO_DEC(std::to_string(ntohs(th.sport))),
                  HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
                  HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), HEX_TO_DEC(std::to_string(th.th_offx2)), HEX_TO_DEC(std::to_string(th.th_flags)),
-                 HEX_TO_DEC(std::to_string(th.th_win)), HEX_TO_DEC(std::to_string(th.th_urp)));
+                 HEX_TO_DEC(std::to_string(th.th_win)), HEX_TO_DEC(std::to_string(th.th_urp)), th.options, sizeof(th.options));
+
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
 
