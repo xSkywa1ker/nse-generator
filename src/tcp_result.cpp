@@ -41,7 +41,9 @@ struct TCPHeader {
     uint16_t window;
     uint16_t check;
     uint16_t urg_ptr;
-    char options[12];
+    uint16_t mss;  // Maximum Segment Size
+    uint8_t window_scale;  // Window Scale
+    uint8_t sack_permitted;  // SACK Permitted
 };
 
 // Структура для TCP-пакета
@@ -60,7 +62,8 @@ uint16_t calculate_tcp_checksum(IPHeader *ip_header, TCPHeader *tcp_header, cons
 void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer_list<uint8_t> ether_shost,u_short ether_type,
                      u_char ver_ihl,u_char tos,u_short tlen,u_short identification, u_short flags_fo,u_char ttl,
                      u_char proto,u_short sport,u_short dport, tcp_seq th_seq,tcp_seq th_ack,u_char th_offx2,
-                     u_char th_flags,u_short th_win, u_short th_urp, const char *options, size_t options_size) {
+                     u_char th_flags,u_short th_win, u_short th_urp,  uint16_t th_mss, uint8_t th_window_scale,
+                     uint8_t th_sack_permitted) {
     char errbuf[PCAP_ERRBUF_SIZE];
     TCPPacket tcpPacket;
     int i = 0;
@@ -88,7 +91,7 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
     tcpPacket.tcp_header.dest = htons(dport);
     tcpPacket.tcp_header.seq = th_seq;
     tcpPacket.tcp_header.ack = th_ack;
-    tcpPacket.tcp_header.doff_reserved = th_offx2;
+    tcpPacket.tcp_header.doff_reserved = ((sizeof(TCPHeader) / 4) << 4) | 0;;
     tcpPacket.tcp_header.flags = th_flags;
     tcpPacket.tcp_header.window = th_win;
     tcpPacket.tcp_header.urg_ptr = th_urp;
@@ -121,9 +124,6 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost,std::initializer
 
     // Копируем данные TCP-заголовка
     std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader), &tcpPacket.tcp_header, sizeof(TCPHeader));
-
-    // Добавляем опции
-    std::memcpy(tcpPacket.tcp_header.options, options, options_size);
 
     // Копируем данные payload
     std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader), tcpPacket.payload, tcpPacket.payload_size);
@@ -245,8 +245,8 @@ uint16_t calculate_tcp_checksum(IPHeader *ip_header, TCPHeader *tcp_header, cons
     return static_cast<uint16_t>(~sum);
 }
 int main() {
-	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 34, 19910, 64, 128, 6,52900, 139, 276054, 0, 128, 02, 61690, 00, "�", 12);
-	send_tcp_packet({0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e},{0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca}, 0x08, 69, 00, 34, 30797, 64, 128, 6,139, 52900, 82248, 276054, 128, 18, 32, 00, "�", 12);
-	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 34, 20166, 64, 128, 6,52900, 139, 276054, 82248, 80, 16, 5152, 00, "", 12);
-	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 34, 24262, 64, 128, 6,52900, 139, 276054, 82248, 80, 20, 00, 00, "", 12);
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 0x2c, 19910, 64, 128, 6,52900, 139, 276054, 0, 128, 02, 61690, 00, 0, 0, 0);
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e},{0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca}, 0x08, 69, 00, 0x2c, 30797, 64, 128, 6,139, 52900, 82248, 276054, 128, 18, 32, 00, 0, 0, 0);
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 0x2c, 20166, 64, 128, 6,52900, 139, 276054, 82248, 80, 16, 5152, 00, 0, 0, 0);
+	send_tcp_packet({0x00, 0x0c, 0x29, 0xfb, 0x82, 0xca},{0x00, 0x0c, 0x29, 0xa3, 0x1e, 0x3e}, 0x08, 69, 00, 0x2c, 24262, 64, 128, 6,52900, 139, 276054, 82248, 80, 20, 00, 00, 0, 0, 0);
 }
