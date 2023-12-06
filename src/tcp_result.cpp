@@ -90,36 +90,13 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost, std::initialize
     tcpPacket.tcp_header.dest = htons(dport);
     tcpPacket.tcp_header.seq = th_seq;
     tcpPacket.tcp_header.ack = th_ack;
-    tcpPacket.tcp_header.doff_reserved = ((sizeof(TCPHeader) / 4) << 4) | (options.size() > 0 ? options.size() : 0);
+    tcpPacket.tcp_header.doff_reserved = ((sizeof(TCPHeader) / 4) << 4) | 0;
     tcpPacket.tcp_header.flags = th_flags;
     tcpPacket.tcp_header.window = th_win;
     tcpPacket.tcp_header.urg_ptr = th_urp;
 
-    // Заполняем IP-заголовок
-    tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
-    tcpPacket.ip_header.check = htons(calculate_ip_checksum(&tcpPacket.ip_header));
-
-    // Заполняем TCP-заголовок
-    tcpPacket.tcp_header.check = htons(calculate_tcp_checksum(&tcpPacket.ip_header, &tcpPacket.tcp_header, tcpPacket.payload, tcpPacket.payload_size));
-
-    // Открываем сессию pcap для отправки
-    pcap_t *send_handle = pcap_open_live("ens35", BUFSIZ, 0, 1000, errbuf);
-    if (send_handle == nullptr) {
-        std::cerr << "Ошибка при открытии сессии pcap: " << errbuf << std::endl;
-        return;
-    }
-
     // Создаем буфер для сырых данных пакета
     uint8_t buffer[sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size];
-
-    // Копируем данные Ethernet-заголовка
-    std::memcpy(buffer, &tcpPacket.ethernet_header, sizeof(EthernetHeader));
-
-    // Копируем данные IP-заголовка
-    std::memcpy(buffer + sizeof(EthernetHeader), &tcpPacket.ip_header, sizeof(IPHeader));
-
-    // Копируем данные TCP-заголовка
-    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader), &tcpPacket.tcp_header, sizeof(TCPHeader));
 
     // Заполняем опции TCP-заголовка
     int option_offset = sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader);
@@ -140,8 +117,34 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost, std::initialize
         option_offset += sizeof(value);
     }
 
+    // Заполняем IP-заголовок
+    tcpPacket.ip_header.tot_len = htons(sizeof(IPHeader) + sizeof(TCPHeader) + tcpPacket.payload_size);
+    tcpPacket.ip_header.check = htons(calculate_ip_checksum(&tcpPacket.ip_header));
+
+    // Заполняем TCP-заголовок
+    tcpPacket.tcp_header.check = htons(calculate_tcp_checksum(&tcpPacket.ip_header, &tcpPacket.tcp_header, tcpPacket.payload, tcpPacket.payload_size));
+
+    // Открываем сессию pcap для отправки
+    pcap_t *send_handle = pcap_open_live("ens35", BUFSIZ, 0, 1000, errbuf);
+    if (send_handle == nullptr) {
+        std::cerr << "Ошибка при открытии сессии pcap: " << errbuf << std::endl;
+        return;
+    }
+
+    // Копируем данные Ethernet-заголовка
+    std::memcpy(buffer, &tcpPacket.ethernet_header, sizeof(EthernetHeader));
+
+    // Копируем данные IP-заголовка
+    std::memcpy(buffer + sizeof(EthernetHeader), &tcpPacket.ip_header, sizeof(IPHeader));
+
+    // Копируем данные TCP-заголовка
+    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader), &tcpPacket.tcp_header, sizeof(TCPHeader));
+
+
+
     // Копируем данные payload
-    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader), tcpPacket.payload, tcpPacket.payload_size);
+    std::memcpy(buffer + sizeof(EthernetHeader) + sizeof(IPHeader) + sizeof(TCPHeader) + options.size() * sizeof(uint32_t),
+                tcpPacket.payload, tcpPacket.payload_size);
 
     // Отправляем пакет
     if (pcap_sendpacket(send_handle, buffer, sizeof(buffer)) != 0) {
@@ -155,7 +158,6 @@ void send_tcp_packet(std::initializer_list<uint8_t> ether_dhost, std::initialize
     std::cout << filt_exp;
     receive_tcp_response("ens35", filt_exp);
 }
-
 
 void receive_tcp_response(const char *dev, const char *filter_exp) {
     std::cout << "Waiting for response..." << std::endl;
