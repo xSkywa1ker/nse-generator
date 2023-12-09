@@ -66,12 +66,11 @@ typedef struct tcp_header
 
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
-std::string getValue(const std::string &line, const ethernet_header &eth, const ip_header &iph, const tcp_header &th);
 int HEX_TO_DEC(const std::string &st);
 
 std::string var = "int main() {\n}";
 
-void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
+void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
 
@@ -95,6 +94,40 @@ void fillFields(const ethernet_header &eth, const ip_header &iph, const tcp_head
                  HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), HEX_TO_DEC(std::to_string(th.th_offx2)), HEX_TO_DEC(std::to_string(th.th_flags)),
                  HEX_TO_DEC(std::to_string(th.th_win)), HEX_TO_DEC(std::to_string(th.th_urp)),
                  th.mss, th.window_scale, th.sack_permitted);
+
+    // Ищем позицию закрывающей фигурной скобки
+    size_t pos = var.rfind("}");
+
+    if (pos != std::string::npos)
+    {
+        // Вставляем данные перед закрывающей фигурной скобкой
+        var.insert(pos, appData);
+    }
+
+    output << var;
+    output.close();
+
+    std::cout << "Программа успешно выполнена\n";
+}
+
+void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
+{
+    std::ofstream output(outputFile, std::ios_base::app);
+
+    if (!output)
+    {
+        std::cerr << "Не удалось открыть файл для записи\n";
+        return;
+    }
+    char appData[350];
+
+    std::sprintf(appData, "\treceive_tcp_response(0x%02x, %02x, %02x, 0x%02x, "
+                          "%02x, %d,%02x, %02x, %02x, %02x, %02x, %02x);\n",
+                 eth.ether_type, HEX_TO_DEC(std::to_string(iph.ver_ihl)),
+                 HEX_TO_DEC(std::to_string(iph.tos)), ntohs(iph.tlen),
+                 HEX_TO_DEC(std::to_string(iph.flags_fo)), iph.proto, HEX_TO_DEC(std::to_string(ntohs(th.sport))),
+                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(th.th_flags)),
+                 HEX_TO_DEC(std::to_string(th.th_win)), HEX_TO_DEC(std::to_string(th.th_urp)));
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -222,7 +255,12 @@ void manager(const u_char *receivedPacket, bool is_scanner)
         outputResult.close();
 
         fillPacket(*ip_hdr, *tcp_hdr);
-        fillFields(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+        if (is_scanner) {
+            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+        }
+        else {
+            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+        }
     }
 }
 
@@ -251,92 +289,6 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len)
     answer = ~sum;
 
     return answer;
-}
-
-std::string getValue(const std::string &line, const ethernet_header &eth, const ip_header &iph, const tcp_header &th)
-{
-    size_t pos = line.find("( ");
-    if (pos < 1000)
-    {
-        // Если "( " найдено, извлекаем значение в пределах скобок
-        size_t endPos = line.find(")");
-        return line.substr(pos + 2, endPos - pos - 2);
-    }
-    else
-    {
-        // Если "( " не найдено, просто возвращаем соответствующее значение из структур
-        if (line.find("dest_mac") != std::string::npos)
-        {
-            return std::to_string(eth.ether_dhost[0]);
-        }
-        else if (line.find("src_mac") != std::string::npos)
-        {
-            return std::to_string(eth.ether_shost[0]);
-        }
-        else if (line.find("ethertype") != std::string::npos)
-        {
-            return std::to_string(eth.ether_type);
-        }
-        else if (line.find("version_ihl") != std::string::npos)
-        {
-            return std::to_string(iph.ver_ihl);
-        }
-        else if (line.find("tos") != std::string::npos)
-        {
-            return std::to_string(iph.tos);
-        }
-        else if (line.find("id =") != std::string::npos)
-        {
-            return std::to_string(ntohs(iph.identification));
-        }
-        else if (line.find("frag_off") != std::string::npos)
-        {
-            return std::to_string(ntohs(iph.flags_fo));
-        }
-        else if (line.find("ttl") != std::string::npos)
-        {
-            // Просто возвращаем значение без конвертации в шестнадцатеричную СС
-            return std::to_string(iph.ttl);
-        }
-        else if (line.find("protocol") != std::string::npos)
-        {
-            // Просто возвращаем значение без конвертации в шестнадцатеричную СС
-            return std::to_string(iph.proto);
-        }
-        else if (line.find("source") != std::string::npos)
-        {
-            return std::to_string(ntohs(th.sport));
-        }
-        else if (line.find("dest") != std::string::npos)
-        {
-            return std::to_string(ntohs(th.dport));
-        }
-        else if (line.find("seq") != std::string::npos)
-        {
-            return std::to_string(ntohl(th.th_seq));
-        }
-        else if (line.find("ack_seq") != std::string::npos)
-        {
-            return std::to_string(ntohl(th.th_ack));
-        }
-        else if (line.find("doff_reserved") != std::string::npos)
-        {
-            return std::to_string(th.th_offx2);
-        }
-        else if (line.find("flags") != std::string::npos)
-        {
-            return std::to_string(th.th_flags);
-        }
-        else if (line.find("window") != std::string::npos)
-        {
-            return std::to_string(ntohs(th.th_win));
-        }
-        else if (line.find("urg_ptr") != std::string::npos)
-        {
-            return std::to_string(ntohs(th.th_urp));
-        }
-    }
-    return "";
 }
 
 int HEX_TO_DEC(const std::string &st)
