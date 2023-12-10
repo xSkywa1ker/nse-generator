@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-int clientSocket;  // Глобальная переменная для клиентского сокета
+int  clientSocket;
 
 // Структура для заголовка IP пакета
 struct IpHeader {
@@ -41,8 +41,7 @@ void send_tcp_packet(
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     const char* ipAddress = "192.168.3.10";
-    // Создание сокета
-    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+
     if (clientSocket < 0) {
         perror("Error creating socket");
         return;
@@ -52,6 +51,8 @@ void send_tcp_packet(
     serverAddress.sin_port = htons(dest_port);
     serverAddress.sin_addr.s_addr = inet_addr(ipAddress);
     if (flags == 0x02) {
+        // Создание сокета
+        clientSocket = socket(AF_INET, SOCK_STREAM, 0);
         // Установка соединения с сервером
         if (connect(clientSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
             perror("Error connecting to server");
@@ -59,15 +60,14 @@ void send_tcp_packet(
             return;
         }
     }
-    struct linger sl;
-    bzero(&sl, sizeof(sl));
-    sl.l_onoff = 1;
-    sl.l_linger = 0;
-    if (setsockopt(clientSocket, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl)) < 0)
-        perror("setsockopt");
-
+    /* struct linger sl;
+     bzero(&sl, sizeof(sl));
+     sl.l_onoff = 1;
+     sl.l_linger = 0;
+     if (setsockopt(clientSocket, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl)) < 0)
+         perror("setsockopt");*/
     if (flags == 0x14) {
-        // Отправка RST
+        //Отправка RST
         close(clientSocket);
     }
 
@@ -105,7 +105,7 @@ void listen_tcp_packet( int dest_port, uint8_t expectedFlags) {
     const char* ipAddress = "192.168.3.10";
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
-
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(dest_port);
     serverAddress.sin_addr.s_addr = inet_addr(ipAddress);
@@ -122,10 +122,8 @@ void listen_tcp_packet( int dest_port, uint8_t expectedFlags) {
     }
 
     // Закрытие сокета после приема пакета
-    close(clientSocket);
+    //close(clientSocket);
 }
-
-
 int main() {
 	send_tcp_packet(19910, 128, 61690, 52900, 139, 276054,00, 02 );
 	listen_tcp_packet(52900, 18);
