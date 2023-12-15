@@ -81,11 +81,11 @@ void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const t
     }
     char appData[350];
 
-    std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %02x, %d,%02x, %02x );\n",
+    std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
                  HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
                  HEX_TO_DEC(std::to_string(ntohs(th.sport))),
                  HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.th_ack))),  HEX_TO_DEC(std::to_string(th.th_flags)));
+                 HEX_TO_DEC(std::to_string(ntohs(th.th_ack))),  th.th_flags);
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -113,8 +113,8 @@ void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tc
     }
     char appData[350];
 
-    std::sprintf(appData, "\tlisten_tcp_packet(%02x, %02x);\n",
-                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(th.th_flags)));
+    std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
+                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");

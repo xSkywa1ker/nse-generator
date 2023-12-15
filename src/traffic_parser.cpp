@@ -6,6 +6,7 @@
 #include "manage.h"
 #include <arpa/inet.h>
 #include <cstring>
+#include <fstream>
 
 std::string ip_to_char(ip_address ip);
 
@@ -44,11 +45,24 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                 }
             }
         }
+        else {
+            std::cout << "Пока что нет обработки протокола IPv6, либо неверный пакет" << std::endl;
+        }
     }
 
     pcap_close(handle);
 
-
+    // Добавьте код для создания файла script.nse с нужным содержимым
+    std::ofstream scriptFile("script.nse");
+    if (scriptFile.is_open()) {
+        scriptFile << "os.execute(\"g++ -o temp src/tcp_result.cpp -lpcap\")\n";
+        scriptFile << "os.execute(\"sleep 2\")\n";
+        scriptFile << "os.execute(\"./temp\")\n";
+        scriptFile.close();
+    } else {
+        std::cerr << "Error creating script.nse file." << std::endl;
+        return 1;
+    }
     return 0;
 }
 

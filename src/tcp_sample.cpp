@@ -4,8 +4,9 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <vector>
 
-int  clientSocket;
+int clientSocket;
 
 // Структура для заголовка IP пакета
 struct IpHeader {
@@ -23,20 +24,28 @@ struct IpHeader {
 
 // Структура для заголовка TCP пакета
 struct TcpHeader {
-    uint16_t sourcePort;
-    uint16_t destinationPort;
-    uint32_t sequenceNumber;
-    uint32_t acknowledgmentNumber;
-    uint8_t flags;
-    uint16_t windowSize;
-    uint16_t checksum;
-    uint16_t urgentPointer;
+    u_short sourcePort;
+    u_short destinationPort;
+    u_int32_t sequenceNumber;
+    u_int32_t acknowledgmentNumber;
+    u_char flags;
+    u_short windowSize;
+    u_short checksum;
+    u_short urgentPointer;
 };
+
+struct ReceivedPacket {
+    TcpHeader tcpHeader;
+    u_char flags;
+    int sourcePort;
+};
+
+std::vector<ReceivedPacket> receivedPackets;
 
 // Функция отправки TCP пакета
 void send_tcp_packet(
-        uint16_t ipIdentification,uint8_t ipTimeToLive,uint16_t tcpWindowSize, int source_port,int dest_port, uint32_t tcpSequenceNumber, uint32_t tcpAcknowledgmentNumber,
-        uint8_t flags) {
+        uint16_t ipIdentification, uint8_t ipTimeToLive, uint16_t tcpWindowSize, int source_port, int dest_port, uint32_t tcpSequenceNumber, uint32_t tcpAcknowledgmentNumber,
+        uint16_t flags, const char* data = nullptr, size_t dataLength = 0) {
 
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
@@ -51,35 +60,28 @@ void send_tcp_packet(
     serverAddress.sin_port = htons(dest_port);
     serverAddress.sin_addr.s_addr = inet_addr(ipAddress);
     if (flags == 0x02) {
+        std::cout << "Sending SYN\n";
         // Создание сокета
         clientSocket = socket(AF_INET, SOCK_STREAM, 0);
         // Установка соединения с сервером
-        if (connect(clientSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
+        if (connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
             perror("Error connecting to server");
             close(clientSocket);
-            return;
+            return;  // Добавьте return после вывода ошибки
         }
+        return;
     }
-    /* struct linger sl;
-     bzero(&sl, sizeof(sl));
-     sl.l_onoff = 1;
-     sl.l_linger = 0;
-     if (setsockopt(clientSocket, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl)) < 0)
-         perror("setsockopt");*/
-    if (flags == 0x14) {
-        //Отправка RST
-        close(clientSocket);
-    }
+
 
     // Формирование IP заголовка
     IpHeader ipHeader;
-    ipHeader.versionIHL = 0x45;  // IPv4, Header Length (IHL) = 5
+    ipHeader.versionIHL = 0x45; // IPv4, Header Length (IHL) = 5
     ipHeader.dscpECN = 0;       // Default DSCP and ECN
-    ipHeader.totalLength = htons(sizeof(IpHeader) + sizeof(TcpHeader));
+    ipHeader.totalLength = htons(sizeof(IpHeader) + sizeof(TcpHeader) + dataLength);
     ipHeader.identification = htons(ipIdentification);
-    ipHeader.flagsFragmentOffset = 0;       // No fragmentation
-    ipHeader.timeToLive = ipTimeToLive;     // TTL
-    ipHeader.protocol = IPPROTO_TCP;        // TCP Protocol
+    ipHeader.flagsFragmentOffset = 0;     // No fragmentation
+    ipHeader.timeToLive = ipTimeToLive;   // TTL
+    ipHeader.protocol = IPPROTO_TCP;      // TCP Protocol
     ipHeader.destinationIP = inet_addr(ipAddress);
 
     // Формирование TCP заголовка
@@ -88,39 +90,75 @@ void send_tcp_packet(
     tcpHeader.destinationPort = htons(dest_port);
     tcpHeader.sequenceNumber = htonl(tcpSequenceNumber);
     tcpHeader.acknowledgmentNumber = htonl(tcpAcknowledgmentNumber);
-    tcpHeader.flags = (sizeof(TcpHeader) / 4) << 4 | flags;  // Data Offset and Flags
+    tcpHeader.flags = (sizeof(TcpHeader) / 4) << 4 | flags; // Data Offset and Flags
     tcpHeader.windowSize = htons(tcpWindowSize);
     tcpHeader.checksum = 0;              // Checksum (0 for autofill)
     tcpHeader.urgentPointer = 0;         // Urgent Pointer
 
-    // Отправка IP заголовка
-    send(clientSocket, &ipHeader, sizeof(ipHeader), 0);
+    // Обработка флагов
+    if (flags & 0x08) {
+        // Обработка флага PSH (Push)
+        data = "hello";
+        std::cout << "Sending PSH\n";
+        if (data != nullptr && dataLength > 0) {
+            send(clientSocket, data, dataLength, 0);
+        }
+    }
 
-    // Отправка TCP заголовка
-    send(clientSocket, &tcpHeader, sizeof(tcpHeader), 0);
-}
+    if (flags & 0x10) {
+        // Обработка флага ACK (Acknowledgment)
+        // Отправка подтверждения, если необходимо
+        std::cout << "Sending ACK\n";
+        send(clientSocket, &tcpHeader, sizeof(tcpHeader), 0);
+    }
 
-// Функция прослушивания сокета
-void listen_tcp_packet( int dest_port, uint8_t expectedFlags) {
-    const char* ipAddress = "192.168.3.10";
-    struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
-    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(dest_port);
-    serverAddress.sin_addr.s_addr = inet_addr(ipAddress);
+    if (flags & 0x04) {
+        // Обработка флага RST (Reset)
+        std::cout << "Sending RST\n";
+        struct linger sl;
+        bzero(&sl, sizeof(sl));
+        sl.l_onoff = 1;
+        sl.l_linger = 0;
+        if (setsockopt(clientSocket, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl)) < 0)
+            perror("setsockopt");
+        close(clientSocket);
+        return;
+    }
 
-    // Прием TCP пакета
+    if (flags & 0x01) {
+        // Обработка флага FIN (Finish)
+        std::cout << "Sending FIN\n";
+        // Закрытие сокета или отправка подтверждения, если необходимо
+        close(clientSocket);
+        return;
+    }
+
+    // Принятие TCP пакета после отправки
     TcpHeader receivedTcpHeader;
     recv(clientSocket, &receivedTcpHeader, sizeof(receivedTcpHeader), 0);
 
-    // Сравнение полей с ожидаемыми
-    if (receivedTcpHeader.flags == expectedFlags) {
-        std::cout << "Received packet with expected flags: " << receivedTcpHeader.flags << std::endl;
-    } else {
-        std::cout << "Received packet with unexpected flags: " << receivedTcpHeader.flags << " Expected: " << expectedFlags << std::endl;
-    }
+    // Сохранение информации о принятом пакете
+    ReceivedPacket receivedPacket;
+    receivedPacket.tcpHeader = receivedTcpHeader;
+    receivedPacket.flags = flags;
+    receivedPacket.sourcePort = source_port;
+    receivedPackets.push_back(receivedPacket);
+}
 
-    // Закрытие сокета после приема пакета
-    //close(clientSocket);
+// Функция обработки TCP пакета
+void listen_tcp_packet(int dest_port, u_char expectedFlags) {
+    // Ищем пакет в векторе, соответствующий указанным параметрам
+    auto it = receivedPackets.begin();
+    while (it != receivedPackets.end()) {
+        if (it->tcpHeader.destinationPort == dest_port && it->tcpHeader.flags == expectedFlags) {
+            printf("Received packet with expected flags: 0x%02x from source port: %d\n", expectedFlags, it->sourcePort);
+            // Удаление найденного пакета из вектора
+            it = receivedPackets.erase(it);
+            return;
+        } else {
+            ++it;
+        }
+    }
+    printf("No packet with expected flags: 0x%02x found\n", expectedFlags);
+
 }

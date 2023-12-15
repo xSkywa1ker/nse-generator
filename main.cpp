@@ -4,7 +4,7 @@
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         std::cerr << "Использование: ./main var1 var2" << std::endl;
-        return 1; // Возвращаем код ошибки
+        return 1;
     }
 
     std::string ip_scanner = argv[1];
@@ -13,6 +13,6 @@ int main(int argc, char *argv[]) {
     std::cout << "IP scanner: " << ip_scanner << std::endl;
     std::cout << "IP victim: " << ip_victim << std::endl;
 
-    traffic_parser("traffic/discover.pcapng",ip_scanner,ip_victim);
+    traffic_parser("traffic/syn_scan_dump.pcapng",ip_scanner,ip_victim);
     return 1;
 }
