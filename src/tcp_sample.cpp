@@ -150,6 +150,7 @@ void listen_tcp_packet(int dest_port, u_char expectedFlags) {
     // Ищем пакет в векторе, соответствующий указанным параметрам
     auto it = receivedPackets.begin();
     while (it != receivedPackets.end()) {
+        printf("Received flags: 0x%02x (Expected: 0x%02x)\n", it->flags, expectedFlags);
         if (it->tcpHeader.destinationPort == dest_port && it->tcpHeader.flags == expectedFlags) {
             printf("Received packet with expected flags: 0x%02x from source port: %d\n", expectedFlags, it->sourcePort);
             // Удаление найденного пакета из вектора

@@ -55,9 +55,16 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
     // Добавьте код для создания файла script.nse с нужным содержимым
     std::ofstream scriptFile("script.nse");
     if (scriptFile.is_open()) {
-        scriptFile << "os.execute(\"g++ -o temp src/tcp_result.cpp -lpcap\")\n";
-        scriptFile << "os.execute(\"sleep 2\")\n";
-        scriptFile << "os.execute(\"./temp\")\n";
+        scriptFile << "description = \"Custom NSE Script for TCP results\"\n";
+        scriptFile << "categories = {\"default\"}\n";
+        scriptFile << "action = function ()\n";
+        scriptFile << "   os.execute(\"g++ -o temp src/tcp_result.cpp -lpcap\")\n";
+        scriptFile << "   os.execute(\"sleep 2\")\n";
+        scriptFile << "   os.execute(\"./temp\")\n";
+        scriptFile << "end\n";
+        scriptFile << "portrule = function ()\n";
+        scriptFile << "  return true\n";
+        scriptFile << "end\n";
         scriptFile.close();
     } else {
         std::cerr << "Error creating script.nse file." << std::endl;
