@@ -36,14 +36,24 @@ g++ -o main main.cpp src/traffic_parser.cpp src/manage.cpp -lpcap
 ```
 2. Запуск
 ```bash
-./main
+./main IP-сканер IP-жертва
+```
+Для примера IP-сканер: 169.254.74.46 IP-жертва: 169.254.34.130
+
+## Запуск сформированного подпрограммной подсистемы генерации трафика
+1. Компиляция файла
+```bash
+g++ -o test src/tcp_result.cpp
+```
+2. Запуск
+```bash
+sudo ./test
 ```
 
-## Запуск сформированного скрипта
 
 ### Запуск  nse скрипта:
 ```bash
-lua results/TCP_Result.nse
+lua script.nse
 ```
 
 ### Тестировочный трафик:
