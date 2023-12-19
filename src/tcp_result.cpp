@@ -60,7 +60,7 @@ void send_tcp_packet(
     serverAddress.sin_port = htons(dest_port);
     serverAddress.sin_addr.s_addr = inet_addr(ipAddress);
     if (flags == 0x02) {
-        std::cout << "Sending SYN\n";
+        std::cout << "Sending SYN to " << dest_port << std::endl;
         // Создание сокета
         clientSocket = socket(AF_INET, SOCK_STREAM, 0);
         // Установка соединения с сервером
@@ -99,7 +99,7 @@ void send_tcp_packet(
     if (flags & 0x08) {
         // Обработка флага PSH (Push)
         data = "hello";
-        std::cout << "Sending PSH\n";
+        std::cout << "Sending PSH to " << dest_port << std::endl;
         if (data != nullptr && dataLength > 0) {
             send(clientSocket, data, dataLength, 0);
         }
@@ -108,13 +108,13 @@ void send_tcp_packet(
     if (flags & 0x10) {
         // Обработка флага ACK (Acknowledgment)
         // Отправка подтверждения, если необходимо
-        std::cout << "Sending ACK\n";
+        std::cout << "Sending ACK to " << dest_port << std::endl;
         send(clientSocket, &tcpHeader, sizeof(tcpHeader), 0);
     }
 
     if (flags & 0x04) {
         // Обработка флага RST (Reset)
-        std::cout << "Sending RST\n";
+        std::cout << "Sending RST to " << dest_port << std::endl;
         struct linger sl;
         bzero(&sl, sizeof(sl));
         sl.l_onoff = 1;
@@ -127,7 +127,7 @@ void send_tcp_packet(
 
     if (flags & 0x01) {
         // Обработка флага FIN (Finish)
-        std::cout << "Sending FIN\n";
+        std::cout << "Sending FIN to " << dest_port << std::endl;
         // Закрытие сокета или отправка подтверждения, если необходимо
         close(clientSocket);
         return;
@@ -143,6 +143,7 @@ void send_tcp_packet(
     receivedPacket.flags = flags;
     receivedPacket.sourcePort = source_port;
     receivedPackets.push_back(receivedPacket);
+    std::cout << "Add packet" << std::endl;
 }
 
 // Функция обработки TCP пакета
@@ -150,9 +151,9 @@ void listen_tcp_packet(int dest_port, u_char expectedFlags) {
     // Ищем пакет в векторе, соответствующий указанным параметрам
     auto it = receivedPackets.begin();
     while (it != receivedPackets.end()) {
+        printf("Received flags: 0x%02x From port: %d (Expected: 0x%02x)\n", it->flags,it->sourcePort, expectedFlags);
         if (it->tcpHeader.destinationPort == dest_port && it->tcpHeader.flags == expectedFlags) {
             printf("Received packet with expected flags: 0x%02x from source port: %d\n", expectedFlags, it->sourcePort);
-            // Удаление найденного пакета из вектора
             it = receivedPackets.erase(it);
             return;
         } else {
@@ -161,9 +162,7 @@ void listen_tcp_packet(int dest_port, u_char expectedFlags) {
     }
     printf("No packet with expected flags: 0x%02x found\n", expectedFlags);
 
-}
-
-int main() {
+}int main() {
 	send_tcp_packet(21168, 128, 61690, 49674,  1, 349829,00, 0x02 );
 	listen_tcp_packet(49674, 0x14);
 	send_tcp_packet(21424, 128, 61690, 49675,  2, 414489,00, 0x02 );
