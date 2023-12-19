@@ -28,6 +28,7 @@ struct TcpHeader {
     u_short destinationPort;
     u_int32_t sequenceNumber;
     u_int32_t acknowledgmentNumber;
+    u_char th_offx2;
     u_char flags;
     u_short windowSize;
     u_short checksum;
@@ -140,8 +141,8 @@ void send_tcp_packet(
     // Сохранение информации о принятом пакете
     ReceivedPacket receivedPacket;
     receivedPacket.tcpHeader = receivedTcpHeader;
-    receivedPacket.flags = flags;
-    receivedPacket.sourcePort = source_port;
+    receivedPacket.flags = receivedTcpHeader.flags;
+    receivedPacket.sourcePort = ntohs(receivedTcpHeader.sourcePort);
     receivedPackets.push_back(receivedPacket);
     std::cout << "Add packet" << std::endl;
 }
