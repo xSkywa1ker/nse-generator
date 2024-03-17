@@ -27,8 +27,11 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
     while ((packetData = pcap_next(handle, &header))) {
         if (header.caplen >= 14) {
             const uint16_t etherType = (packetData[12] << 8) | packetData[13];
-            if (etherType == 0x0806){
-                std::cout << "ARP";
+            if (etherType == 0x0806) {
+                std::cout << "ARP ";
+                arp_header *arpHeader = (arp_header *)(packetData + 14);
+                uint32_t senderIP = arpHeader->sender_ip;
+                std::cout << "Sender IP: " << int_to_ip(senderIP) << std::endl;
             }
             if (etherType == 0x0800) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);
