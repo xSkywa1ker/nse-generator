@@ -131,60 +131,6 @@ void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tc
     std::cout << "Программа успешно выполнена\n";
 }
 
-void processTCPOptions(const u_char *optionsPtr, int optionsLength, tcp_header &th) {
-    // Инициализируем значения опций
-    th.mss = 0;
-    th.window_scale = 0;
-    th.sack_permitted = false;
-
-    // Пока есть опции
-    while (optionsLength > 0) {
-        u_char optionKind = *optionsPtr;
-        u_char optionLength = *(optionsPtr + 1);
-
-        // Проверка на случай, если optionLength = 0, что может привести к бесконечному циклу
-        if (optionLength == 0) {
-            break;
-        }
-
-        // Обработка данных опции
-        switch (optionKind) {
-            case 0x02: // MSS option
-                if (optionLength == 4) {
-                    th.mss = ntohs(*reinterpret_cast<const u_short*>(optionsPtr + 2));
-                    std::cout << "MSS Option: " << th.mss << std::endl;
-                }
-                break;
-
-            case 0x03: // Window Scale option
-                if (optionLength == 3) {
-                    th.window_scale = *(optionsPtr + 2);
-                    std::cout << "Window Scale Option: " << static_cast<int>(th.window_scale) << std::endl;
-                }
-                break;
-
-            case 0x04: // SACK Permitted option
-                if (optionLength == 2) {
-                    th.sack_permitted = true;
-                    std::cout << "SACK Permitted Option" << std::endl;
-                }
-                break;
-
-                // Добавьте обработку других опций при необходимости
-
-            default:
-                // Неизвестная опция, пропускаем
-                break;
-        }
-
-        optionsPtr += optionLength; // Переходим к следующей опции
-        optionsLength -= optionLength; // Уменьшаем оставшуюся длину опций
-    }
-}
-
-
-
-
 void fillPacket(ip_header &iph, tcp_header &th)
 {
 
@@ -218,13 +164,15 @@ void fillPacket(ip_header &iph, tcp_header &th)
     std::cout << "TCP Header flags: " << th.th_flags << std::endl;
 }
 
-void manager(const u_char *receivedPacket, bool is_scanner)
+// теперь это не менеджер, а анализатор и надо сделать большой рефаторинг кода: декомпозицию компонент чтобы не дублировать код для каждого протокола
+
+void manager(const u_char *receivedPacket, bool is_scanner, int proto)
 {
     ethernet_header *eth_hdr = (ethernet_header *)(receivedPacket);
     ip_header *ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6)
     {
-        tcp_header *tcp_hdr = (tcp_header *)((u_char *)ip_hdr + (ip_hdr->ver_ihl & 0x0F) * 4);
+        tcp_header* tcp_hdr = *receivedPacket;
 
         // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
         std::ifstream inputTemplate("src/tcp_sample.cpp");

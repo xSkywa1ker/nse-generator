@@ -29,19 +29,23 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
             const uint16_t etherType = (packetData[12] << 8) | packetData[13];
             if (etherType == 0x0800) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);
+                bool is_scanner = true;
+                if (ip_to_char(ipHeader->saddr) == ip_scanner) {
+                    std::cout << "scanner" << std::endl;
+                    is_scanner = true;
+                }
+                else {
+                    std::cout << "victim" << std::endl;
+                    is_scanner = false;
+                }
                 if (ipHeader->proto == 6) {
                     tcp_header *tcpHeader = (tcp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
                     std::cout << "TCP" << std::endl;
-                    if (ip_to_char(ipHeader->saddr) == ip_scanner) {
-                        std::cout << "scanner" << std::endl;
-                        manager(packetData, true);
-                    }
-                    else if (ip_to_char(ipHeader->saddr) == ip_victim){
-                        std::cout << "victim" << std::endl;
-                        manager(packetData, false);
-                    }
+                    manager(tcpHeader, is_scanner, 6);
                 } else if (ipHeader->proto == 17) {
                     udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
+                    std::cout << "UDP" << std::endl;
+                    manager(udpHeader, is_scanner, 17);
                 }
             }
         }
