@@ -46,12 +46,12 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                     std::cout << "TCP" << std::endl;
                     manager(tcpHeader, is_scanner, 6);
                 } else if (ipHeader->proto == 17) {
-                    udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
-                    std::cout << "UDP" << std::endl;
+                    udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     if (udpHeader->source == 67 || udpHeader->dest == 68) {
                         std::cout << "DHCP" << std::endl;
-                        manager(DHCPHeader, is_scanner, 67);
+                        manager(dhcpHeader, is_scanner, 67);
                     } else {
+                        std::cout << "UDP" << std::endl;
                         manager(udpHeader, is_scanner, 17);
                     }
                 }
