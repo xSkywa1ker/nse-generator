@@ -179,8 +179,8 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         tcp_header* tcp_hdr = *receivedPacket;
 
         // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
-        std::ifstream inputTemplate("src/tcp_sample.cpp");
-        std::ofstream outputResult("src/tcp_result.cpp");
+        std::ifstream inputTemplate("sample/tcp_sample.cpp");
+        std::ofstream outputResult("result/tcp_result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
@@ -195,10 +195,10 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
 
         fillPacket(*ip_hdr, *tcp_hdr);
         if (is_scanner) {
-            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
         }
         else {
-            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
         }
     }
 }
