@@ -135,7 +135,7 @@ void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tc
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillPacket(ip_header &iph, tcp_header &th)
+void fillTCPPacket(ip_header &iph, tcp_header &th)
 {
 
     iph.ver_ihl = (4 << 4) | (sizeof(ip_header) / 4); // Версия и длина заголовка
@@ -193,7 +193,7 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         inputTemplate.close();
         outputResult.close();
 
-        fillPacket(*ip_hdr, *tcp_hdr);
+        fillTCPPacket(*ip_hdr, *tcp_hdr);
         if (is_scanner) {
             fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
         }
