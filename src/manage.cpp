@@ -131,15 +131,15 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
+void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
-
     if (!output)
     {
         std::cerr << "Не удалось открыть файл для записи\n";
         return;
     }
+    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
 
     std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
