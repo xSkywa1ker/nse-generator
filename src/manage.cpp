@@ -74,26 +74,27 @@ class packetProccesing{
 
 };
 
-void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
+void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
-
     if (!output)
     {
         std::cerr << "Не удалось открыть файл для записи\n";
         return;
     }
+    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
+    if (proto == 6){
+        tcp_header* th = *receivedPacket;
+        std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
+                     HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
+                     HEX_TO_DEC(std::to_string(ntohs(th.sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
+                     HEX_TO_DEC(std::to_string(ntohs(th.th_ack))),  th.th_flags);
 
-    std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
-                 HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
-                 HEX_TO_DEC(std::to_string(ntohs(th.sport))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.th_ack))),  th.th_flags);
-
-    // Ищем позицию закрывающей фигурной скобки
-    size_t pos = var.rfind("}");
-
+        // Ищем позицию закрывающей фигурной скобки
+        size_t pos = var.rfind("}");
+    }
     if (pos != std::string::npos)
     {
         // Вставляем данные перед закрывающей фигурной скобкой
@@ -137,7 +138,8 @@ void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tc
 
 void fillTCPPacket(ip_header &iph, tcp_header &th)
 {
-
+    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
+    tcp_header* th = *receivedPacket;
     iph.ver_ihl = (4 << 4) | (sizeof(ip_header) / 4); // Версия и длина заголовка
     iph.tlen = htons(sizeof(ip_header) + sizeof(tcp_header));
 
@@ -172,12 +174,8 @@ void fillTCPPacket(ip_header &iph, tcp_header &th)
 
 void manager(const u_char *receivedPacket, bool is_scanner, int proto)
 {
-    ethernet_header *eth_hdr = (ethernet_header *)(receivedPacket);
-    ip_header *ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6)
     {
-        tcp_header* tcp_hdr = *receivedPacket;
-
         // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
         std::ifstream inputTemplate("sample/tcp_sample.cpp");
         std::ofstream outputResult("result/tcp_result.cpp");
@@ -187,19 +185,19 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файлы tcp_sample.cpp или tcp_result.cpp\n";
             return;
         }
-
         outputResult << inputTemplate.rdbuf();
-
         inputTemplate.close();
         outputResult.close();
-
         fillTCPPacket(*ip_hdr, *tcp_hdr);
         if (is_scanner) {
-            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
+            fillFieldsScanner(*receivedPacket, 6, "results/tcp_result.cpp");
         }
         else {
-            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
+            fillFieldsVictim(*receivedPacket, 6, "results/tcp_result.cpp");
         }
+    }
+    else if(proto == 17){
+
     }
 }
 
