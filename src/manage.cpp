@@ -70,6 +70,10 @@ int HEX_TO_DEC(const std::string &st);
 
 std::string var = "int main() {\n}";
 
+class packetProccesing{
+
+};
+
 void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
