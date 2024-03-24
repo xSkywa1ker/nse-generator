@@ -72,32 +72,50 @@ std::string var = "int main() {\n}";
 
 void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
     tcp_header* th = *receivedPacket;
-    std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
-                 HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
-                 HEX_TO_DEC(std::to_string(ntohs(th.sport))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.th_ack))),  th.th_flags);
+    if(isScanner) {
+        std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
+                     HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
+                     HEX_TO_DEC(std::to_string(ntohs(th.sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
+                     HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), th.th_flags);
 
-    // Ищем позицию закрывающей фигурной скобки
-    size_t pos = var.rfind("}");
+        // Ищем позицию закрывающей фигурной скобки
+        size_t pos = var.rfind("}");
+    }
+    else {
+        std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
+
+        // Ищем позицию закрывающей фигурной скобки
+        size_t pos = var.rfind("}");
+
+    }
 }
 
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
     tcp_header* uh = *receivedPacket;
+    if (isScanner) {
+        //TODO По аналогии заполнение полей по аналогии с TCP
 
-    //TODO По аналогии заполнение полей по аналогии с TCP
-
-    // Ищем позицию закрывающей фигурной скобки
-    size_t pos = var.rfind("}");
+        // Ищем позицию закрывающей фигурной скобки
+        size_t pos = var.rfind("}");
+    }
+    else {
+        //TODO По аналогии заполнение полей по аналогии с TCP
+    }
 }
 
 void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
     tcp_header* dhcph = *receivedPacket;
+    if(isScanner) {
+        //TODO По аналогии заполнение полей по аналогии с TCP
 
-    //TODO По аналогии заполнение полей по аналогии с TCP
-
-    // Ищем позицию закрывающей фигурной скобки
-    size_t pos = var.rfind("}");
+        // Ищем позицию закрывающей фигурной скобки
+        size_t pos = var.rfind("}");
+    }
+    else {
+        //TODO По аналогии заполнение полей по аналогии с TCP
+    }
 }
 
 void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::string &outputFile)
@@ -141,12 +159,15 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
     }
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
-
-    std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
-                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
-
-    // Ищем позицию закрывающей фигурной скобки
-    size_t pos = var.rfind("}");
+    if (proto == 6){
+        callTcp(false, receivedPacket, *appData);
+    }
+    else if(proto == 17){
+        callUdp(false, receivedPacket, *appData);
+    }
+    else if(proto == 67){
+        callDHCP(false, receivedPacket, *appData);
+    }
 
     if (pos != std::string::npos)
     {
