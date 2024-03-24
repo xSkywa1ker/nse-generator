@@ -78,16 +78,10 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
                      HEX_TO_DEC(std::to_string(ntohs(th.sport))),
                      HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
                      HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), th.th_flags);
-
-        // Ищем позицию закрывающей фигурной скобки
-        size_t pos = var.rfind("}");
     }
     else {
         std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
                      HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
-
-        // Ищем позицию закрывающей фигурной скобки
-        size_t pos = var.rfind("}");
 
     }
 }
@@ -97,8 +91,6 @@ void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
     if (isScanner) {
         //TODO По аналогии заполнение полей по аналогии с TCP
 
-        // Ищем позицию закрывающей фигурной скобки
-        size_t pos = var.rfind("}");
     }
     else {
         //TODO По аналогии заполнение полей по аналогии с TCP
@@ -110,8 +102,7 @@ void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
     if(isScanner) {
         //TODO По аналогии заполнение полей по аналогии с TCP
 
-        // Ищем позицию закрывающей фигурной скобки
-        size_t pos = var.rfind("}");
+
     }
     else {
         //TODO По аналогии заполнение полей по аналогии с TCP
@@ -137,6 +128,10 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
     else if(proto == 67){
         callDHCP(true, receivedPacket, *appData);
     }
+
+    // Ищем позицию закрывающей фигурной скобки
+    size_t pos = var.rfind("}");
+
     if (pos != std::string::npos)
     {
         // Вставляем данные перед закрывающей фигурной скобкой
@@ -168,6 +163,9 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
     else if(proto == 67){
         callDHCP(false, receivedPacket, *appData);
     }
+
+    // Ищем позицию закрывающей фигурной скобки
+    size_t pos = var.rfind("}");
 
     if (pos != std::string::npos)
     {
