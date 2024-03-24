@@ -70,6 +70,10 @@ int HEX_TO_DEC(const std::string &st);
 
 std::string var = "int main() {\n}";
 
+class packetProccesing{
+
+};
+
 void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
@@ -131,7 +135,7 @@ void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tc
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillPacket(ip_header &iph, tcp_header &th)
+void fillTCPPacket(ip_header &iph, tcp_header &th)
 {
 
     iph.ver_ihl = (4 << 4) | (sizeof(ip_header) / 4); // Версия и длина заголовка
@@ -175,8 +179,8 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         tcp_header* tcp_hdr = *receivedPacket;
 
         // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
-        std::ifstream inputTemplate("src/tcp_sample.cpp");
-        std::ofstream outputResult("src/tcp_result.cpp");
+        std::ifstream inputTemplate("sample/tcp_sample.cpp");
+        std::ofstream outputResult("result/tcp_result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
@@ -189,12 +193,12 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         inputTemplate.close();
         outputResult.close();
 
-        fillPacket(*ip_hdr, *tcp_hdr);
+        fillTCPPacket(*ip_hdr, *tcp_hdr);
         if (is_scanner) {
-            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
         }
         else {
-            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "src/tcp_result.cpp");
+            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
         }
     }
 }

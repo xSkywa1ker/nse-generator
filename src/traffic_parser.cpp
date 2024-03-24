@@ -27,6 +27,12 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
     while ((packetData = pcap_next(handle, &header))) {
         if (header.caplen >= 14) {
             const uint16_t etherType = (packetData[12] << 8) | packetData[13];
+            if (etherType == 0x0806) {
+                std::cout << "ARP ";
+                arp_header *arpHeader = (arp_header *)(packetData + 14);
+                uint32_t senderIP = arpHeader->sender_ip;
+                std::cout << "Sender IP: " << int_to_ip(senderIP) << std::endl;
+            }
             if (etherType == 0x0800) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);
                 bool is_scanner = true;
@@ -43,9 +49,19 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                     std::cout << "TCP" << std::endl;
                     manager(tcpHeader, is_scanner, 6);
                 } else if (ipHeader->proto == 17) {
-                    udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
-                    std::cout << "UDP" << std::endl;
-                    manager(udpHeader, is_scanner, 17);
+                    udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
+                    if (udpHeader->source == 67 || udpHeader->dest == 68) {
+                        std::cout << "DHCP" << std::endl;
+                        manager(dhcpHeader, is_scanner, 67);
+                    } else {
+                        std::cout << "UDP" << std::endl;
+                        manager(udpHeader, is_scanner, 17);
+                    }
+                }
+                else if (ipHeader->proto == 2) {
+                    icmp_header *icmpHeader = (icmp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
+                    std::cout << "ICMP" << std::endl;
+                    manager(icmpHeader, is_scanner, 2);
                 }
             }
         }
