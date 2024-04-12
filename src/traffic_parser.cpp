@@ -31,7 +31,6 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                 std::cout << "ARP ";
                 arp_header *arpHeader = (arp_header *)(packetData + 14);
                 uint32_t senderIP = arpHeader->sender_ip;
-                std::cout << "Sender IP: " << int_to_ip(senderIP) << std::endl;
             }
             if (etherType == 0x0800) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);

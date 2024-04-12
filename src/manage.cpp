@@ -219,6 +219,7 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
 {
     if (ip_hdr->proto == 6)
     {
+        tcp_header *tcpHeader = (tcp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
         // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
         std::ifstream inputTemplate("sample/tcp_sample.cpp");
         std::ofstream outputResult("result/tcp_result.cpp");
@@ -240,7 +241,26 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         }
     }
     else if(proto == 17){
+        udpp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
+        // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
+        std::ifstream inputTemplate("sample/udp_sample.cpp");
+        std::ofstream outputResult("result/udp_result.cpp");
 
+        if (!inputTemplate || !outputResult)
+        {
+            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            return;
+        }
+        outputResult << inputTemplate.rdbuf();
+        inputTemplate.close();
+        outputResult.close();
+        fillTCPPacket(*receivedPacket);
+        if (is_scanner) {
+            fillFieldsScanner(*receivedPacket, 6, "results/udp_result.cpp");
+        }
+        else {
+            fillFieldsVictim(*receivedPacket, 6, "results/udp_result.cpp");
+        }
     }
 }
 
