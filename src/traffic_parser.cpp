@@ -72,7 +72,6 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
 
     pcap_close(handle);
 
-    // Добавьте код для создания файла script.nse с нужным содержимым
     std::ofstream scriptFile("script.nse");
     if (scriptFile.is_open()) {
         scriptFile << "description = \"Custom NSE Script for TCP results\"\n";
