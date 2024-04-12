@@ -38,10 +38,8 @@ void send_udp_packet(int source_port, int dest_port, const char* data, size_t da
     serverAddress.sin_port = htons(dest_port);
     serverAddress.sin_addr.s_addr = inet_addr(ipAddress);
 
-    // Создание сокета
     clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
-    // Отправка данных
     sendto(clientSocket, data, dataLength, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
 }
 

@@ -19,7 +19,7 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
         return 1;
     }
 
-    std::vector<std::vector<unsigned char*>> packets;  // Вектор для хранения информации о TCP пакетах
+    std::vector<std::vector<unsigned char*>> packets;  // Вектор для хранения информации о пакетах
 
     struct pcap_pkthdr header;
     const u_char *packetData;
@@ -31,7 +31,6 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                 std::cout << "ARP ";
                 arp_header *arpHeader = (arp_header *)(packetData + 14);
                 uint32_t senderIP = arpHeader->sender_ip;
-                std::cout << "Sender IP: " << int_to_ip(senderIP) << std::endl;
             }
             if (etherType == 0x0800) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);
@@ -72,7 +71,6 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
 
     pcap_close(handle);
 
-    // Добавьте код для создания файла script.nse с нужным содержимым
     std::ofstream scriptFile("script.nse");
     if (scriptFile.is_open()) {
         scriptFile << "description = \"Custom NSE Script for TCP results\"\n";

@@ -68,16 +68,14 @@ void send_tcp_packet(
         if (connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
             perror("Error connecting to server");
             close(clientSocket);
-            return;  // Добавьте return после вывода ошибки
+            return;
         }
         return;
     }
 
-
-    // Формирование IP заголовка
     IpHeader ipHeader;
-    ipHeader.versionIHL = 0x45; // IPv4, Header Length (IHL) = 5
-    ipHeader.dscpECN = 0;       // Default DSCP and ECN
+    ipHeader.versionIHL = 0x45;
+    ipHeader.dscpECN = 0;
     ipHeader.totalLength = htons(sizeof(IpHeader) + sizeof(TcpHeader) + dataLength);
     ipHeader.identification = htons(ipIdentification);
     ipHeader.flagsFragmentOffset = 0;     // No fragmentation
@@ -85,16 +83,15 @@ void send_tcp_packet(
     ipHeader.protocol = IPPROTO_TCP;      // TCP Protocol
     ipHeader.destinationIP = inet_addr(ipAddress);
 
-    // Формирование TCP заголовка
     TcpHeader tcpHeader;
     tcpHeader.sourcePort = htons(source_port);
     tcpHeader.destinationPort = htons(dest_port);
     tcpHeader.sequenceNumber = htonl(tcpSequenceNumber);
     tcpHeader.acknowledgmentNumber = htonl(tcpAcknowledgmentNumber);
-    tcpHeader.flags = (sizeof(TcpHeader) / 4) << 4 | flags; // Data Offset and Flags
+    tcpHeader.flags = (sizeof(TcpHeader) / 4) << 4 | flags;
     tcpHeader.windowSize = htons(tcpWindowSize);
-    tcpHeader.checksum = 0;              // Checksum (0 for autofill)
-    tcpHeader.urgentPointer = 0;         // Urgent Pointer
+    tcpHeader.checksum = 0;
+    tcpHeader.urgentPointer = 0;
 
     // Обработка флагов
     if (flags & 0x08) {

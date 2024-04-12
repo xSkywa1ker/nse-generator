@@ -64,32 +64,82 @@ typedef struct tcp_header
     bool sack_permitted; // SACK Permitted option
 } tcp_header;
 
+typedef struct udp_header
+{
+    u_short sport;
+    u_short dport;
+    u_short len;
+    u_short checksum;
+    u_char data[1];
+} udp_header;
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 int HEX_TO_DEC(const std::string &st);
 
 std::string var = "int main() {\n}";
 
-class packetProccesing{
+void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
+    tcp_header* th = *receivedPacket;
+    if(isScanner) {
+        std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
+                     HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
+                     HEX_TO_DEC(std::to_string(ntohs(th.sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
+                     HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), th.th_flags);
+    }
+    else {
+        std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
 
-};
+    }
+}
 
-void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
+void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
+    udp_header* uh = *receivedPacket;
+    if(isScanner) {
+        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x,);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(uh.sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(uh.dport))),
+                     HEX_TO_DEC(uh->len), HEX_TO_DEC(uh->data);
+    }
+    else {
+        std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
+
+    }
+}
+
+void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
+    tcp_header* dhcph = *receivedPacket;
+    if(isScanner) {
+        //TODO По аналогии заполнение полей по аналогии с TCP
+
+
+    }
+    else {
+        //TODO По аналогии заполнение полей по аналогии с TCP
+    }
+}
+
+void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
-
     if (!output)
     {
         std::cerr << "Не удалось открыть файл для записи\n";
         return;
     }
+    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
-
-    std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
-                 HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
-                 HEX_TO_DEC(std::to_string(ntohs(th.sport))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
-                 HEX_TO_DEC(std::to_string(ntohs(th.th_ack))),  th.th_flags);
+    if (proto == 6){
+        callTcp(true, receivedPacket, *appData);
+    }
+    else if(proto == 17){
+        callUdp(true, receivedPacket, *appData);
+    }
+    else if(proto == 67){
+        callDHCP(true, receivedPacket, *appData);
+    }
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -106,19 +156,25 @@ void fillFieldsScanner(const ethernet_header &eth, const ip_header &iph, const t
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tcp_header &th, const std::string &outputFile)
+void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string &outputFile)
 {
     std::ofstream output(outputFile, std::ios_base::app);
-
     if (!output)
     {
         std::cerr << "Не удалось открыть файл для записи\n";
         return;
     }
+    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
-
-    std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
-                 HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
+    if (proto == 6){
+        callTcp(false, receivedPacket, *appData);
+    }
+    else if(proto == 17){
+        callUdp(false, receivedPacket, *appData);
+    }
+    else if(proto == 67){
+        callDHCP(false, receivedPacket, *appData);
+    }
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -135,9 +191,10 @@ void fillFieldsVictim(const ethernet_header &eth, const ip_header &iph, const tc
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillTCPPacket(ip_header &iph, tcp_header &th)
+void fillTCPPacket(const u_char *receivedPacket)
 {
-
+    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
+    tcp_header* th = *receivedPacket;
     iph.ver_ihl = (4 << 4) | (sizeof(ip_header) / 4); // Версия и длина заголовка
     iph.tlen = htons(sizeof(ip_header) + sizeof(tcp_header));
 
@@ -172,12 +229,9 @@ void fillTCPPacket(ip_header &iph, tcp_header &th)
 
 void manager(const u_char *receivedPacket, bool is_scanner, int proto)
 {
-    ethernet_header *eth_hdr = (ethernet_header *)(receivedPacket);
-    ip_header *ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6)
     {
-        tcp_header* tcp_hdr = *receivedPacket;
-
+        tcp_header *tcpHeader = (tcp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
         // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
         std::ifstream inputTemplate("sample/tcp_sample.cpp");
         std::ofstream outputResult("result/tcp_result.cpp");
@@ -187,18 +241,37 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файлы tcp_sample.cpp или tcp_result.cpp\n";
             return;
         }
-
         outputResult << inputTemplate.rdbuf();
-
         inputTemplate.close();
         outputResult.close();
-
-        fillTCPPacket(*ip_hdr, *tcp_hdr);
+        fillTCPPacket(*receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
+            fillFieldsScanner(*receivedPacket, 6, "results/tcp_result.cpp");
         }
         else {
-            fillFieldsVictim(*eth_hdr, *ip_hdr, *tcp_hdr, "results/tcp_result.cpp");
+            fillFieldsVictim(*receivedPacket, 6, "results/tcp_result.cpp");
+        }
+    }
+    else if(proto == 17){
+        udpp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
+        // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
+        std::ifstream inputTemplate("sample/udp_sample.cpp");
+        std::ofstream outputResult("result/udp_result.cpp");
+
+        if (!inputTemplate || !outputResult)
+        {
+            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            return;
+        }
+        outputResult << inputTemplate.rdbuf();
+        inputTemplate.close();
+        outputResult.close();
+        fillTCPPacket(*receivedPacket);
+        if (is_scanner) {
+            fillFieldsScanner(*receivedPacket, 6, "results/udp_result.cpp");
+        }
+        else {
+            fillFieldsVictim(*receivedPacket, 6, "results/udp_result.cpp");
         }
     }
 }
