@@ -64,6 +64,14 @@ typedef struct tcp_header
     bool sack_permitted; // SACK Permitted option
 } tcp_header;
 
+typedef struct udp_header
+{
+    u_short sport;
+    u_short dport;
+    u_short len;
+    u_short checksum;
+    u_char data[1];
+} udp_header;
 
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 int HEX_TO_DEC(const std::string &st);
@@ -87,13 +95,17 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
 }
 
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
-    tcp_header* uh = *receivedPacket;
-    if (isScanner) {
-        //TODO По аналогии заполнение полей по аналогии с TCP
-
+    udp_header* uh = *receivedPacket;
+    if(isScanner) {
+        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x,);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(uh.sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(uh.dport))),
+                     HEX_TO_DEC(uh->len), HEX_TO_DEC(uh->data);
     }
     else {
-        //TODO По аналогии заполнение полей по аналогии с TCP
+        std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
+
     }
 }
 
