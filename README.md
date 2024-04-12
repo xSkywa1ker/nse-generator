@@ -27,6 +27,11 @@ sudo apt update
 sudo apt install lua-socket
 ```
 
+1. Установить libpcap
+```bash
+sudo apt-get install libpcap-dev
+```
+
 ## Запуск управляющей программы
 В программе можем указать любые данные для полей TCP пакета и по шаблону получим
 программу выдающую lua-скрипт, генерирующий такой пакет.
