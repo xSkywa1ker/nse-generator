@@ -97,15 +97,28 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
     udp_header* uh = *receivedPacket;
     if(isScanner) {
-        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x,);\n",
+        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %02x);\n",
                      HEX_TO_DEC(std::to_string(ntohs(uh.sport))),
                      HEX_TO_DEC(std::to_string(ntohs(uh.dport))),
-                     HEX_TO_DEC(uh->len), HEX_TO_DEC(uh->data);
+                     HEX_TO_DEC(ntosh(uh->len)), HEX_TO_DEC(ntohs(uh->data));
     }
     else {
-        std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
+        std::sprintf(appData, "\tlisten_udp_packet(%02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))));
+    }
+}
 
+void callICMP(bool isScanner, const u_char *receivedPacket, char *appData){
+    udp_header* uh = *receivedPacket;
+    if(isScanner) {
+        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(uh.sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(uh.dport))),
+                     HEX_TO_DEC(ntosh(uh->len)), HEX_TO_DEC(ntohs(uh->data));
+    }
+    else {
+        std::sprintf(appData, "\tlisten_udp_packet(%02x);\n",
+                     HEX_TO_DEC(std::to_string(ntohs(th.dport))));
     }
 }
 
