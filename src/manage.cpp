@@ -179,7 +179,7 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillTCPPacket(ip_header &iph, tcp_header &th)
+void fillTCPPacket(const u_char *receivedPacket)
 {
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     tcp_header* th = *receivedPacket;
@@ -231,7 +231,7 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         outputResult << inputTemplate.rdbuf();
         inputTemplate.close();
         outputResult.close();
-        fillTCPPacket(*ip_hdr, *tcp_hdr);
+        fillTCPPacket(*receivedPacket);
         if (is_scanner) {
             fillFieldsScanner(*receivedPacket, 6, "results/tcp_result.cpp");
         }

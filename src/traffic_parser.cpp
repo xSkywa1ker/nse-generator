@@ -19,7 +19,7 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
         return 1;
     }
 
-    std::vector<std::vector<unsigned char*>> packets;  // Вектор для хранения информации о TCP пакетах
+    std::vector<std::vector<unsigned char*>> packets;  // Вектор для хранения информации о пакетах
 
     struct pcap_pkthdr header;
     const u_char *packetData;
