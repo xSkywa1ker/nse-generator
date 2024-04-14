@@ -45,7 +45,7 @@ std::vector<ReceivedPacket> receivedPackets;
 
 // Функция отправки TCP пакета
 void send_tcp_packet(
-        uint16_t ipIdentification, uint8_t ipTimeToLive, uint16_t tcpWindowSize, int source_port, int dest_port, uint32_t tcpSequenceNumber, uint32_t tcpAcknowledgmentNumber,
+       uint16_t tcpWindowSize, int source_port, int dest_port, uint32_t tcpSequenceNumber, uint32_t tcpAcknowledgmentNumber,
         uint16_t flags, const char* data = nullptr, size_t dataLength = 0) {
 
     struct sockaddr_in serverAddress;

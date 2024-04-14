@@ -101,8 +101,8 @@ std::string var = "int main() {\n}";
 void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
     tcp_header* th = (tcp_header *)receivedPacket;
     if(isScanner) {
-        std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
-                     HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th->th_win)),
+        std::sprintf(appData, "\tsend_tcp_packet(%02x, %02x, %2x, %d,%02x, 0x%02x );\n",
+                     HEX_TO_DEC(std::to_string(th->th_win)),
                      HEX_TO_DEC(std::to_string(ntohs(th->sport))),
                      HEX_TO_DEC(std::to_string(ntohs(th->dport))), HEX_TO_DEC(std::to_string(ntohs(th->th_seq))),
                      HEX_TO_DEC(std::to_string(ntohs(th->th_ack))), th->th_flags);
@@ -117,10 +117,10 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
     udp_header* uh = (udp_header *)receivedPacket;
     if(isScanner) {
-        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %02x);\n",
+        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %s);\n",
                      HEX_TO_DEC(std::to_string(ntohs(uh->sport))),
                      HEX_TO_DEC(std::to_string(ntohs(uh->dport))),
-                     HEX_TO_DEC(ntohs(uh->len)), HEX_TO_DEC(ntohs(uh->data)));
+                     ntohs(uh->len), uh->data);
     }
     else {
         std::sprintf(appData, "\tlisten_udp_packet(%02x);\n",
@@ -131,10 +131,11 @@ void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
 void callICMP(bool isScanner, const u_char *receivedPacket, char *appData){
     icmp_header* ih = (icmp_header *)receivedPacket;
     if(isScanner) {
-        std::sprintf(appData, "\tsend_icmp_packet(%02x, %02x, %02x, %02x);\n",
+        std::sprintf(appData, "\tsend_icmp_packet(%02x, %02x, %02x, %02x, %02x);\n",
                      HEX_TO_DEC(std::to_string(ih->type)),
-                     HEX_TO_DEC(std::to_string(ih->code))),
-                HEX_TO_DEC(ntosh(ih->checksum)), HEX_TO_DEC(ntohs(ih->identifier)), HEX_TO_DEC(ntohs(ih->sequenceNumber));
+                     HEX_TO_DEC(std::to_string(ih->code)),
+                HEX_TO_DEC(ntohs(ih->checksum)), ih->identifier,
+                HEX_TO_DEC(ntohs(ih->sequenceNumber)));
     }
     else {
         std::sprintf(appData, "\tlisten_icmp_packet(%02x);\n",
@@ -238,7 +239,7 @@ void fillTCPPacket(const u_char *receivedPacket)
 
 // теперь это не менеджер, а анализатор и надо сделать большой рефаторинг кода: декомпозицию компонент чтобы не дублировать код для каждого протокола
 
-void analizer(const void *receivedPacket, bool is_scanner, int proto)
+void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 {
     if (ip_hdr->proto == 6)
     {
@@ -254,12 +255,12 @@ void analizer(const void *receivedPacket, bool is_scanner, int proto)
         outputResult << inputTemplate.rdbuf();
         inputTemplate.close();
         outputResult.close();
-        fillTCPPacket(*receivedPacket);
+        fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(*receivedPacket, 6, "results/tcp_result.cpp");
+            fillFieldsScanner(receivedPacket, 6, "results/tcp_result.cpp");
         }
         else {
-            fillFieldsVictim(*receivedPacket, 6, "results/tcp_result.cpp");
+            fillFieldsVictim(receivedPacket, 6, "results/tcp_result.cpp");
         }
     }
     else if(proto == 17){
@@ -276,10 +277,10 @@ void analizer(const void *receivedPacket, bool is_scanner, int proto)
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(*receivedPacket, 17, "results/udp_result.cpp");
+            fillFieldsScanner(receivedPacket, 17, "results/udp_result.cpp");
         }
         else {
-            fillFieldsVictim(*receivedPacket, 17, "results/udp_result.cpp");
+            fillFieldsVictim(receivedPacket, 17, "results/udp_result.cpp");
         }
     }
     else if (proto == 2){
@@ -296,10 +297,10 @@ void analizer(const void *receivedPacket, bool is_scanner, int proto)
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(*receivedPacket, 2, "results/icmp_result.cpp");
+            fillFieldsScanner(receivedPacket, 2, "results/icmp_result.cpp");
         }
         else {
-            fillFieldsVictim(*receivedPacket, 2, "results/icmp_result.cpp");
+            fillFieldsVictim(receivedPacket, 2, "results/icmp_result.cpp");
         }
     }
 }
@@ -331,67 +332,16 @@ uint16_t pcap_in_cksum(unsigned short *addr, int len)
     return answer;
 }
 
-int HEX_TO_DEC(const std::string &st)
-{
-    int i, s, k, p;
-    s = 0;
-    p = st.length() - 1;
-    for (i = 0; st[i] != '\0'; i++)
-    {
-        switch (toupper(st[i]))
-        {
-            case 'a':
-                k = 10;
-                break;
-            case 'b':
-                k = 11;
-                break;
-            case 'c':
-                k = 12;
-                break;
-            case 'd':
-                k = 13;
-                break;
-            case 'e':
-                k = 14;
-                break;
-            case 'f':
-                k = 15;
-                break;
-            case '1':
-                k = 1;
-                break;
-            case '2':
-                k = 2;
-                break;
-            case '3':
-                k = 3;
-                break;
-            case '4':
-                k = 4;
-                break;
-            case '5':
-                k = 5;
-                break;
-            case '6':
-                k = 6;
-                break;
-            case '7':
-                k = 7;
-                break;
-            case '8':
-                k = 8;
-                break;
-            case '9':
-                k = 9;
-                break;
-            case '0':
-                k = 0;
-                break;
+int HEX_TO_DEC(const std::string &st) {
+    int num = 0;
+    for (char i : st) {
+        if (i >= '0' && i <= '9') {
+            num = num * 16 + (i - '0');
+        } else if (i >= 'a' && i <= 'f') {
+            num = num * 16 + (i - 'a' + 10);
+        } else if (i >= 'A' && i <= 'F') {
+            num = num * 16 + (i - 'A' + 10);
         }
-        s = s + k * pow(16, p);
-        p--;
     }
-    std::cout << s << std::endl;
-    return s;
+    return num;
 }
