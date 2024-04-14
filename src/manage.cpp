@@ -17,6 +17,18 @@
 #define SIZE_UDP 8
 #define MAX_OPTION_SIZE 40
 
+typedef struct arp_header {
+    u_short hardware_type;     // Тип аппаратного устройства
+    u_short protocol_type;     // Тип протокола
+    u_char hardware_len;       // Длина аппаратного адреса
+    u_char protocol_len;       // Длина протокольного адреса
+    u_short opcode;            // Операционный код
+    u_char sender_mac[6];     // MAC-адрес отправителя
+    u_char sender_ip[4];      // IP-адрес отправителя
+    u_char target_mac[6];     // MAC-адрес получателя
+    u_char target_ip[4];      // IP-адрес получателя
+} arp_header;
+
 typedef struct ip_address
 {
     u_char byte1;
@@ -73,52 +85,60 @@ typedef struct udp_header
     u_char data[1];
 } udp_header;
 
+typedef struct icmp_header {
+    uint8_t type;
+    uint8_t code;
+    uint16_t checksum;
+    uint16_t identifier;
+    uint16_t sequenceNumber;
+} icmp_header;
+
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 int HEX_TO_DEC(const std::string &st);
 
 std::string var = "int main() {\n}";
 
 void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
-    tcp_header* th = *receivedPacket;
+    tcp_header* th = (tcp_header *)receivedPacket;
     if(isScanner) {
         std::sprintf(appData, "\tsend_tcp_packet(%02x, %d, %02x, %02x, %2x, %d,%02x, 0x%02x );\n",
-                     HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th.th_win)),
-                     HEX_TO_DEC(std::to_string(ntohs(th.sport))),
-                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), HEX_TO_DEC(std::to_string(ntohs(th.th_seq))),
-                     HEX_TO_DEC(std::to_string(ntohs(th.th_ack))), th.th_flags);
+                     HEX_TO_DEC(std::to_string(iph.identification)), iph.ttl, HEX_TO_DEC(std::to_string(th->th_win)),
+                     HEX_TO_DEC(std::to_string(ntohs(th->sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(th->dport))), HEX_TO_DEC(std::to_string(ntohs(th->th_seq))),
+                     HEX_TO_DEC(std::to_string(ntohs(th->th_ack))), th->th_flags);
     }
     else {
         std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(th.dport))), th.th_flags);
+                     HEX_TO_DEC(std::to_string(ntohs(th->dport))), th->th_flags);
 
     }
 }
 
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
-    udp_header* uh = *receivedPacket;
+    udp_header* uh = (udp_header *)receivedPacket;
     if(isScanner) {
         std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(uh.sport))),
-                     HEX_TO_DEC(std::to_string(ntohs(uh.dport))),
-                     HEX_TO_DEC(ntosh(uh->len)), HEX_TO_DEC(ntohs(uh->data));
+                     HEX_TO_DEC(std::to_string(ntohs(uh->sport))),
+                     HEX_TO_DEC(std::to_string(ntohs(uh->dport))),
+                     HEX_TO_DEC(ntohs(uh->len)), HEX_TO_DEC(ntohs(uh->data)));
     }
     else {
         std::sprintf(appData, "\tlisten_udp_packet(%02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(th.dport))));
+                     HEX_TO_DEC(std::to_string(ntohs(uh->dport))));
     }
 }
 
 void callICMP(bool isScanner, const u_char *receivedPacket, char *appData){
-    udp_header* uh = *receivedPacket;
+    icmp_header* ih = (icmp_header *)receivedPacket;
     if(isScanner) {
-        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(uh.sport))),
-                     HEX_TO_DEC(std::to_string(ntohs(uh.dport))),
-                     HEX_TO_DEC(ntosh(uh->len)), HEX_TO_DEC(ntohs(uh->data));
+        std::sprintf(appData, "\tsend_icmp_packet(%02x, %02x, %02x, %02x);\n",
+                     HEX_TO_DEC(std::to_string(ih->type)),
+                     HEX_TO_DEC(std::to_string(ih->code))),
+                HEX_TO_DEC(ntosh(ih->checksum)), HEX_TO_DEC(ntohs(ih->identifier)), HEX_TO_DEC(ntohs(ih->sequenceNumber));
     }
     else {
-        std::sprintf(appData, "\tlisten_udp_packet(%02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(th.dport))));
+        std::sprintf(appData, "\tlisten_icmp_packet(%02x);\n",
+                     HEX_TO_DEC(std::to_string(ih->type)));
     }
 }
 
@@ -210,42 +230,19 @@ void fillTCPPacket(const u_char *receivedPacket)
     tcp_header* th = *receivedPacket;
     iph.ver_ihl = (4 << 4) | (sizeof(ip_header) / 4); // Версия и длина заголовка
     iph.tlen = htons(sizeof(ip_header) + sizeof(tcp_header));
-
     u_char *optionsPtr = reinterpret_cast<u_char*>(&th) + SIZE_TCP;
-
-// Вычисляем смещение опций
     int offset = (th.th_offx2 >> 4) - 5;
-
-// Печать для отладки
-    std::cout << "Size of TCP header: " << SIZE_TCP << std::endl;
-    std::cout << "Offset to options: " << (th.th_offx2 >> 4) * 4 << std::endl;
-    std::cout << "Options start address: " << std::hex << (void*)optionsPtr << std::endl;
-
-    // Обрабатываем опции
-    processTCPOptions(optionsPtr, offset, th);
-
-
-
     iph.crc = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&iph), sizeof(ip_header)));
-
-
     th.th_sum = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&th), sizeof(tcp_header)));
-
-    std::cout << "IP Header Version: " << std::hex << ((iph.ver_ihl & 0xF0) >> 4) << std::endl;
-    std::cout << "IP Header IHL: " << std::hex << (iph.ver_ihl & 0x0F) << std::endl;
-    std::cout << "TCP Header Sport: " << ntohs(th.sport) << std::endl;
-    std::cout << "TCP Header Dport: " << ntohs(th.dport) << std::endl;
-    std::cout << "TCP Header flags: " << th.th_flags << std::endl;
 }
 
 // теперь это не менеджер, а анализатор и надо сделать большой рефаторинг кода: декомпозицию компонент чтобы не дублировать код для каждого протокола
 
-void manager(const u_char *receivedPacket, bool is_scanner, int proto)
+void analizer(const void *receivedPacket, bool is_scanner, int proto)
 {
     if (ip_hdr->proto == 6)
     {
-        tcp_header *tcpHeader = (tcp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
-        // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
+        const tcp_header *tcpHeader = static_cast<const tcp_header*>(packetHeader);
         std::ifstream inputTemplate("sample/tcp_sample.cpp");
         std::ofstream outputResult("result/tcp_result.cpp");
 
@@ -266,8 +263,7 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         }
     }
     else if(proto == 17){
-        udpp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
-        // Копируем содержимое tcp_sample.cpp в tcp_result.cpp
+        const udp_header *udpHeader = static_cast<const udp_header*>(packetHeader);
         std::ifstream inputTemplate("sample/udp_sample.cpp");
         std::ofstream outputResult("result/udp_result.cpp");
 
@@ -279,12 +275,31 @@ void manager(const u_char *receivedPacket, bool is_scanner, int proto)
         outputResult << inputTemplate.rdbuf();
         inputTemplate.close();
         outputResult.close();
-        fillTCPPacket(*receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(*receivedPacket, 6, "results/udp_result.cpp");
+            fillFieldsScanner(*receivedPacket, 17, "results/udp_result.cpp");
         }
         else {
-            fillFieldsVictim(*receivedPacket, 6, "results/udp_result.cpp");
+            fillFieldsVictim(*receivedPacket, 17, "results/udp_result.cpp");
+        }
+    }
+    else if (proto == 2){
+        const icmp_header *icmpHeader = static_cast<const icmp_header*>(packetHeader);
+        std::ifstream inputTemplate("sample/icmp_sample.cpp");
+        std::ofstream outputResult("result/icmp_result.cpp");
+
+        if (!inputTemplate || !outputResult)
+        {
+            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            return;
+        }
+        outputResult << inputTemplate.rdbuf();
+        inputTemplate.close();
+        outputResult.close();
+        if (is_scanner) {
+            fillFieldsScanner(*receivedPacket, 2, "results/icmp_result.cpp");
+        }
+        else {
+            fillFieldsVictim(*receivedPacket, 2, "results/icmp_result.cpp");
         }
     }
 }

@@ -35,6 +35,18 @@ typedef struct ip_header {
 
 typedef u_int32_t tcp_seq;
 
+typedef struct arp_header {
+    u_short hardware_type;     // Тип аппаратного устройства
+    u_short protocol_type;     // Тип протокола
+    u_char hardware_len;       // Длина аппаратного адреса
+    u_char protocol_len;       // Длина протокольного адреса
+    u_short opcode;            // Операционный код
+    u_char sender_mac[6];     // MAC-адрес отправителя
+    u_char sender_ip[4];      // IP-адрес отправителя
+    u_char target_mac[6];     // MAC-адрес получателя
+    u_char target_ip[4];      // IP-адрес получателя
+} arp_header;
+
 typedef struct tcp_header {
     u_short sport;          // Source port
     u_short dport;          // Destination port
@@ -53,5 +65,13 @@ typedef struct udp_header {
     u_short len;            // Datagram length
     u_short crc;            // Checksum
 } udp_header;
+
+typedef struct icmp_header {
+    uint8_t type;
+    uint8_t code;
+    uint16_t checksum;
+    uint16_t identifier;
+    uint16_t sequenceNumber;
+} icmp_header;
 
 #endif
