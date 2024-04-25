@@ -44,23 +44,22 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                     is_scanner = false;
                 }
                 if (ipHeader->proto == 6) {
-                    tcp_header *tcpHeader = (tcp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) << 2));
                     std::cout << "TCP" << std::endl;
-                    analizer(tcpHeader, is_scanner, 6);
+                    analizer(packetData, is_scanner, 6);
                 } else if (ipHeader->proto == 17) {
                     udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     if (udpHeader->sport == 67 || udpHeader->dport == 68) {
                         std::cout << "DHCP" << std::endl;
-                        //analizer(dhcpHeader, is_scanner, 67);
+                        analizer(packetData, is_scanner, 67);
                     } else {
                         std::cout << "UDP" << std::endl;
-                        analizer(udpHeader, is_scanner, 17);
+                        analizer(packetData, is_scanner, 17);
                     }
                 }
                 else if (ipHeader->proto == 2) {
                     icmp_header *icmpHeader = (icmp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     std::cout << "ICMP" << std::endl;
-                    analizer(icmpHeader, is_scanner, 2);
+                    analizer(packetData, is_scanner, 2);
                 }
             }
         }

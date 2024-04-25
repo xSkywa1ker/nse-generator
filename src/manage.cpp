@@ -131,11 +131,11 @@ void callUdp(bool isScanner, const u_char *receivedPacket, char *appData){
 void callICMP(bool isScanner, const u_char *receivedPacket, char *appData){
     icmp_header* ih = (icmp_header *)receivedPacket;
     if(isScanner) {
-        std::sprintf(appData, "\tsend_icmp_packet(%02x, %02x, %02x, %02x, %02x);\n",
+        std::sprintf(appData, "\tsend_icmp_packet(%02x, %02x, %02x, %02x);\n",
                      HEX_TO_DEC(std::to_string(ih->type)),
                      HEX_TO_DEC(std::to_string(ih->code)),
-                HEX_TO_DEC(ntohs(ih->checksum)), ih->identifier,
-                HEX_TO_DEC(ntohs(ih->sequenceNumber)));
+                     ih->identifier,
+                HEX_TO_DEC(std::to_string(ntohs(ih->sequenceNumber))));
     }
     else {
         std::sprintf(appData, "\tlisten_icmp_packet(%02x);\n",
@@ -144,7 +144,7 @@ void callICMP(bool isScanner, const u_char *receivedPacket, char *appData){
 }
 
 void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
-    tcp_header* dhcph = *receivedPacket;
+    //tcp_header* dhcph = (dhcp*)receivedPacket;
     if(isScanner) {
         //TODO По аналогии заполнение полей по аналогии с TCP
 
@@ -166,13 +166,13 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6){
-        callTcp(true, receivedPacket, *appData);
+        callTcp(true, receivedPacket, appData);
     }
     else if(proto == 17){
-        callUdp(true, receivedPacket, *appData);
+        callUdp(true, receivedPacket, appData);
     }
     else if(proto == 67){
-        callDHCP(true, receivedPacket, *appData);
+        callDHCP(true, receivedPacket, appData);
     }
 
     // Ищем позицию закрывающей фигурной скобки
@@ -201,13 +201,13 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6){
-        callTcp(false, receivedPacket, *appData);
+        callTcp(false, receivedPacket, appData);
     }
     else if(proto == 17){
-        callUdp(false, receivedPacket, *appData);
+        callUdp(false, receivedPacket, appData);
     }
     else if(proto == 67){
-        callDHCP(false, receivedPacket, *appData);
+        callDHCP(false, receivedPacket, appData);
     }
 
     // Ищем позицию закрывающей фигурной скобки
@@ -227,29 +227,30 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
 
 void fillTCPPacket(const u_char *receivedPacket)
 {
-    ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
-    tcp_header* th = *receivedPacket;
-    iph.ver_ihl = (4 << 4) | (sizeof(ip_header) / 4); // Версия и длина заголовка
-    iph.tlen = htons(sizeof(ip_header) + sizeof(tcp_header));
+    ip_header* iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
+    tcp_header* th = (tcp_header *)receivedPacket;
+    iph->ver_ihl = (4 << 4) | (sizeof(ip_header) / 4);
+    iph->tlen = htons(sizeof(ip_header) + sizeof(tcp_header));
     u_char *optionsPtr = reinterpret_cast<u_char*>(&th) + SIZE_TCP;
-    int offset = (th.th_offx2 >> 4) - 5;
-    iph.crc = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&iph), sizeof(ip_header)));
-    th.th_sum = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&th), sizeof(tcp_header)));
+    int offset = (th->th_offx2 >> 4) - 5;
+    iph->crc = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&iph), sizeof(ip_header)));
+    th->th_sum = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&th), sizeof(tcp_header)));
 }
 
 // теперь это не менеджер, а анализатор и надо сделать большой рефаторинг кода: декомпозицию компонент чтобы не дублировать код для каждого протокола
 
 void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 {
+    ip_header* ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6)
     {
-        const tcp_header *tcpHeader = static_cast<const tcp_header*>(packetHeader);
-        std::ifstream inputTemplate("sample/tcp_sample.cpp");
-        std::ofstream outputResult("result/tcp_result.cpp");
+        tcp_header *tcpHeader = (tcp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) << 2));
+        std::ifstream inputTemplate("samples/tcp_sample.cpp");
+        std::ofstream outputResult("results/result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
-            std::cerr << "Не удалось открыть файлы tcp_sample.cpp или tcp_result.cpp\n";
+            std::cerr << "Не удалось открыть файлы tcp_sample.cpp или result.cpp\n";
             return;
         }
         outputResult << inputTemplate.rdbuf();
@@ -257,16 +258,16 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         outputResult.close();
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 6, "results/tcp_result.cpp");
+            fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
         }
         else {
-            fillFieldsVictim(receivedPacket, 6, "results/tcp_result.cpp");
+            fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
         }
     }
     else if(proto == 17){
-        const udp_header *udpHeader = static_cast<const udp_header*>(packetHeader);
-        std::ifstream inputTemplate("sample/udp_sample.cpp");
-        std::ofstream outputResult("result/udp_result.cpp");
+        udp_header *udpHeader = (udp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
+        std::ifstream inputTemplate("samples/udp_sample.cpp");
+        std::ofstream outputResult("results/udp_result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
@@ -284,8 +285,8 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         }
     }
     else if (proto == 2){
-        const icmp_header *icmpHeader = static_cast<const icmp_header*>(packetHeader);
-        std::ifstream inputTemplate("sample/icmp_sample.cpp");
+        icmp_header *icmpHeader = (icmp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
+        std::ifstream inputTemplate("samples/icmp_sample.cpp");
         std::ofstream outputResult("result/icmp_result.cpp");
 
         if (!inputTemplate || !outputResult)
