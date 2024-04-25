@@ -255,7 +255,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
     if (templateFlag.firstCopied){
         std::ifstream inputTemplate("samples/includes.cpp");
         std::ofstream outputResult("results/result.cpp");
-        f (!inputTemplate || !outputResult)
+        if (!inputTemplate || !outputResult)
         {
             std::cerr << "Не удалось открыть файл result.cpp\n";
             return;
