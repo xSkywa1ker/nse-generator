@@ -6,8 +6,6 @@
 #include <arpa/inet.h>
 #include <vector>
 
-int clientSocket;
-
 // Структура для заголовка ICMP пакета
 struct IcmpHeader {
     uint8_t type;           // Тип сообщения ICMP
@@ -25,47 +23,77 @@ struct ReceivedPacket {
 
 std::vector<ReceivedPacket> receivedPackets;
 
-// Функция отправки ICMP пакета
-void send_icmp_packet(const char* dest_ip) {
+void send_and_receive_icmp_packet(const char* dest_ip) {
+    int clientSocket;
+
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
 
+    clientSocket = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (clientSocket < 0) {
         perror("Error creating socket");
         return;
     }
 
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(0); // Произвольный порт
+    inet_pton(AF_INET, dest_ip, &serverAddress.sin_addr);
 
-    // Создание сокета
-    clientSocket = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-
-    // Формирование ICMP пакета
     IcmpHeader icmpPacket;
-    // Заполнение icmpPacket данными
+    memset(&icmpPacket, 0, sizeof(icmpPacket));
+    icmpPacket.type = 8; // ICMP Echo Request
+    icmpPacket.code = 0;
+    icmpPacket.identifier = getpid();
+    icmpPacket.sequenceNumber = 1;
+    icmpPacket.checksum = 0; // Вычислится автоматически при отправке
 
-    // Отправка ICMP пакета
+    // Отправляем ICMP пакет
     sendto(clientSocket, &icmpPacket, sizeof(icmpPacket), 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
-}
 
-// Функция принятия ICMP пакета
-void receive_icmp_packet() {
-    struct sockaddr_in clientAddress;
-    socklen_t addrLen = sizeof(clientAddress);
+    // Ожидаем прихода ICMP пакета
+    struct sockaddr_in senderAddress;
+    socklen_t senderAddrLen = sizeof(senderAddress);
     char buffer[1024]; // Буфер для приёма данных
+    ssize_t dataSize = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&senderAddress, &senderAddrLen);
 
-    // Создание сокета
-    int serverSocket = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-
-    // Получение данных
-    recvfrom(serverSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
-
-    // Обработка полученных данных
+    // Создаем объект ReceivedPacket и записываем его в вектор
     ReceivedPacket receivedPacket;
-    // Заполнение receivedPacket данными из буфера, если необходимо
-
+    memcpy(&receivedPacket.icmpHeader, buffer, sizeof(IcmpHeader));
+    receivedPacket.sourcePort = ntohs(senderAddress.sin_port);
     receivedPackets.push_back(receivedPacket);
-    // Дополнительная обработка полученных данных, если необходимо
+
+    close(clientSocket);
 }
 
+void process_received_packet() {
+    if (receivedPackets.empty()) {
+        std::cout << "No ICMP packets to process.\n";
+        return;
+    }
+
+    // Получаем первый пакет из вектора
+    ReceivedPacket packet = receivedPackets.front();
+
+    // Выводим информацию о пакете
+    std::cout << "Received ICMP packet:\n"
+              << "Type: " << static_cast<int>(packet.icmpHeader.type) << "\n"
+              << "Code: " << static_cast<int>(packet.icmpHeader.code) << "\n"
+              << "Checksum: " << ntohs(packet.icmpHeader.checksum) << "\n"
+              << "Identifier: " << ntohs(packet.icmpHeader.identifier) << "\n"
+              << "Sequence Number: " << ntohs(packet.icmpHeader.sequenceNumber) << "\n"
+              << "Source Port: " << packet.sourcePort << "\n";
+
+    // Удаляем обработанный пакет из вектора
+    receivedPackets.erase(receivedPackets.begin());
+}
+
+int main() {
+    const char* dest_ip = "127.0.0.1"; // IP-адрес, на который отправляется ICMP пакет
+
+    // Отправляем и принимаем ICMP пакет
+    send_and_receive_icmp_packet(dest_ip);
+
+    // Обрабатываем полученный ICMP пакет
+    process_received_packet();
+
+    return 0;
+}

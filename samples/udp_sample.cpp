@@ -24,7 +24,7 @@ struct ReceivedPacket {
 std::vector<ReceivedPacket> receivedPackets;
 
 // Функция отправки UDP пакета
-void send_udp_packet(int source_port, int dest_port, const char* data, size_t dataLength) {
+void send_udp_packet(int source_port, int dest_port,  size_t dataLength, const char* data) {
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     const char* ipAddress = "192.168.3.10";
