@@ -1,12 +1,3 @@
-#include <iostream>
-#include <cstring>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <vector>
-
-// Структура для заголовка ICMP пакета
 struct IcmpHeader {
     uint8_t type;           // Тип сообщения ICMP
     uint8_t code;           // Код сообщения ICMP

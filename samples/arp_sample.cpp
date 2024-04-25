@@ -1,10 +1,3 @@
-#include <iostream>
-#include <cstring>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <vector>
-
 // Структура для заголовка ARP пакета
 struct ArpHeader {
     uint16_t hardwareType;

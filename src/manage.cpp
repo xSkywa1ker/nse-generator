@@ -93,6 +93,17 @@ typedef struct icmp_header {
     uint16_t sequenceNumber;
 } icmp_header;
 
+struct TemplateFlag {
+    bool firstCopied = true;
+    bool tcpCopied = false;
+    bool udpCopied = false;
+    bool icmpCopied = false;
+    bool dhcpCopied = false;
+    bool arpCopied = false;
+};
+
+TemplateFlag templateFlag;
+
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 int HEX_TO_DEC(const std::string &st);
 
@@ -241,6 +252,19 @@ void fillTCPPacket(const u_char *receivedPacket)
 
 void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 {
+    if (templateFlag.firstCopied){
+        std::ifstream inputTemplate("samples/includes.cpp");
+        std::ofstream outputResult("results/result.cpp");
+        f (!inputTemplate || !outputResult)
+        {
+            std::cerr << "Не удалось открыть файл result.cpp\n";
+            return;
+        }
+        outputResult << inputTemplate.rdbuf();
+        templateFlag.firstCopied = false;
+        inputTemplate.close();
+        outputResult.close();
+    }
     ip_header* ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6)
     {
@@ -253,7 +277,32 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файлы tcp_sample.cpp или result.cpp\n";
             return;
         }
-        outputResult << inputTemplate.rdbuf();
+        if (!templateFlag.tcpCopied) {
+            // Читаем содержимое шаблона в строку
+            std::ifstream inputTemplate("samples/tcp_sample.cpp");
+            if (inputTemplate) {
+                std::ostringstream buffer;
+                buffer << inputTemplate.rdbuf();
+                templateContent = buffer.str();
+                inputTemplate.close();
+            } else {
+                std::cerr << "Не удалось открыть файл tcp_sample.cpp\n";
+                return;
+            }
+
+            // Ищем позицию последнего вхождения инструкции #include
+            size_t lastIncludePos = outputResult.str().rfind("#include");
+            if (lastIncludePos != std::string::npos) {
+                // Вставляем содержимое шаблона после последнего #include
+                outputResult.seekp(lastIncludePos + 8); // Смещаемся на конец #include
+                outputResult << "\n" << templateContent;
+            } else {
+                // Если инструкция #include не найдена, просто вставляем в конец файла
+                outputResult.seekp(0, std::ios_base::end);
+                outputResult << "\n" << templateContent;
+            }
+            templateFlag.tcpCopied = true;
+        }
         inputTemplate.close();
         outputResult.close();
         fillTCPPacket(receivedPacket);
@@ -274,7 +323,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
             return;
         }
-        outputResult << inputTemplate.rdbuf();
+        if (!templateFlag.udpCopied) {
+            outputResult << inputTemplate.rdbuf();
+            templateFlag.udpCopied = true;
+        }
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
@@ -294,7 +346,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
             return;
         }
-        outputResult << inputTemplate.rdbuf();
+        if (!templateFlag.icmpCopied) {
+            outputResult << inputTemplate.rdbuf();
+            templateFlag.icmpCopied = true;
+        }
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
