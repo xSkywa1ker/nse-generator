@@ -277,21 +277,25 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файлы tcp_sample.cpp или result.cpp\n";
             return;
         }
+        std::string templateContent;
         if (!templateFlag.tcpCopied) {
-            // Читаем содержимое шаблона в строку
             std::ifstream inputTemplate("samples/tcp_sample.cpp");
-            if (inputTemplate) {
-                std::ostringstream buffer;
-                buffer << inputTemplate.rdbuf();
-                templateContent = buffer.str();
-                inputTemplate.close();
-            } else {
+            if (!inputTemplate) {
                 std::cerr << "Не удалось открыть файл tcp_sample.cpp\n";
                 return;
             }
 
+            std::ostringstream outputResultBuffer;
+            outputResultBuffer << outputResult.rdbuf();  // Считываем содержимое файла вывода в строковый буфер
+            std::string outputResultContent = outputResultBuffer.str();
+
+            std::ostringstream buffer;
+            buffer << inputTemplate.rdbuf();
+            templateContent = buffer.str();
+            inputTemplate.close();
+
             // Ищем позицию последнего вхождения инструкции #include
-            size_t lastIncludePos = outputResult.str().rfind("#include");
+            size_t lastIncludePos = outputResultContent.rfind("#include");
             if (lastIncludePos != std::string::npos) {
                 // Вставляем содержимое шаблона после последнего #include
                 outputResult.seekp(lastIncludePos + 8); // Смещаемся на конец #include
@@ -302,9 +306,8 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
                 outputResult << "\n" << templateContent;
             }
             templateFlag.tcpCopied = true;
+            outputResult.close();
         }
-        inputTemplate.close();
-        outputResult.close();
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
             fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
