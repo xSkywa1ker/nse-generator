@@ -121,7 +121,6 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
     else {
         std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
                      HEX_TO_DEC(std::to_string(ntohs(th->dport))), th->th_flags);
-
     }
 }
 
@@ -166,14 +165,22 @@ void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
     }
 }
 
-void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::string &outputFile)
-{
+void putMainIntoResult(const std::string &outputFile){
     std::ofstream output(outputFile, std::ios_base::app);
     if (!output)
     {
         std::cerr << "Не удалось открыть файл для записи\n";
         return;
     }
+
+    output << var;
+    output.close();
+
+    std::cout << "Программа успешно выполнена\n";
+}
+
+void fillFieldsScanner(const u_char *receivedPacket, int proto)
+{
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6){
@@ -198,21 +205,10 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
         // Вставляем данные перед закрывающей фигурной скобкой
         var.insert(pos, appData);
     }
-
-    output << var;
-    output.close();
-
-    std::cout << "Программа успешно выполнена\n";
 }
 
-void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string &outputFile)
+void fillFieldsVictim(const u_char *receivedPacket, int proto)
 {
-    std::ofstream output(outputFile, std::ios_base::app);
-    if (!output)
-    {
-        std::cerr << "Не удалось открыть файл для записи\n";
-        return;
-    }
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6){
@@ -236,11 +232,6 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
         // Вставляем данные перед закрывающей фигурной скобкой
         var.insert(pos, appData);
     }
-
-    output << var;
-    output.close();
-
-    std::cout << "Программа успешно выполнена\n";
 }
 
 void fillTCPPacket(const u_char *receivedPacket)
@@ -268,7 +259,7 @@ void copyFileToString(const std::string& filename, std::string& content) {
     inputFile.close();
 }
 
-void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
+void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isLast)
 {
     if (templateFlag.firstCopied){
         std::ifstream inputTemplate("samples/includes.cpp");
@@ -383,6 +374,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         else {
             fillFieldsVictim(receivedPacket, 2, "results/result.cpp");
         }
+    }
+    if (isLast){
+        putMainIntoResult("results/result.cpp");
     }
 }
 

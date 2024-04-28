@@ -24,8 +24,12 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
 
     struct pcap_pkthdr header;
     const u_char *packetData;
-
-    while ((packetData = pcap_next(handle, &header))) {
+    bool isLast = false;
+    do {
+        returnValue = pcap_next_ex(handle, &header, &packetData);
+        if(returnValue == 1){
+            isLast = true;
+        }
         if (header.caplen >= 14) {
             const uint16_t etherType = (packetData[12] << 8) | packetData[13];
             if (etherType == 0x0806) {
@@ -45,28 +49,28 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                 }
                 if (ipHeader->proto == 6) {
                     std::cout << "TCP" << std::endl;
-                    analizer(packetData, is_scanner, 6);
+                    analizer(packetData, is_scanner, 6, isLast);
                 } else if (ipHeader->proto == 17) {
                     udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     if (udpHeader->sport == 67 || udpHeader->dport == 68) {
                         std::cout << "DHCP" << std::endl;
-                        analizer(packetData, is_scanner, 67);
+                        analizer(packetData, is_scanner, 67, isLast);
                     } else {
                         std::cout << "UDP" << std::endl;
-                        analizer(packetData, is_scanner, 17);
+                        analizer(packetData, is_scanner, 17, isLast);
                     }
                 }
                 else if (ipHeader->proto == 2) {
                     icmp_header *icmpHeader = (icmp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     std::cout << "ICMP" << std::endl;
-                    analizer(packetData, is_scanner, 2);
+                    analizer(packetData, is_scanner, 2, isLast);
                 }
             }
         }
         else {
             std::cout << "Пока что нет обработки протокола IPv6, либо неверный пакет" << std::endl;
         }
-    }
+    } while (returnValue == 1);
 
     pcap_close(handle);
 
