@@ -319,7 +319,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
     else if(proto == 17){
         udp_header *udpHeader = (udp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
         std::ifstream inputTemplate("samples/udp_sample.cpp");
-        std::ofstream outputResult("results/udp_result.cpp");
+        std::ofstream outputResult("results/result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
@@ -336,13 +336,13 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             fillFieldsScanner(receivedPacket, 17, "results/udp_result.cpp");
         }
         else {
-            fillFieldsVictim(receivedPacket, 17, "results/udp_result.cpp");
+            fillFieldsVictim(receivedPacket, 17, "results/result.cpp");
         }
     }
     else if (proto == 2){
         icmp_header *icmpHeader = (icmp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
         std::ifstream inputTemplate("samples/icmp_sample.cpp");
-        std::ofstream outputResult("result/icmp_result.cpp");
+        std::ofstream outputResult("result/result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
@@ -359,7 +359,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             fillFieldsScanner(receivedPacket, 2, "results/icmp_result.cpp");
         }
         else {
-            fillFieldsVictim(receivedPacket, 2, "results/icmp_result.cpp");
+            fillFieldsVictim(receivedPacket, 2, "results/result.cpp");
         }
     }
 }
