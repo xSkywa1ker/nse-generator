@@ -323,7 +323,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 
         if (!inputTemplate || !outputResult)
         {
-            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            std::cerr << "Не удалось открыть файлы udp_sample.cpp или result.cpp\n";
             return;
         }
         if (!templateFlag.udpCopied) {
@@ -333,7 +333,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 17, "results/udp_result.cpp");
+            fillFieldsScanner(receivedPacket, 17, "results/result.cpp");
         }
         else {
             fillFieldsVictim(receivedPacket, 17, "results/result.cpp");
@@ -346,7 +346,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 
         if (!inputTemplate || !outputResult)
         {
-            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            std::cerr << "Не удалось открыть файлы icmp_sample.cpp или result.cpp\n";
             return;
         }
         if (!templateFlag.icmpCopied) {
@@ -356,7 +356,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 2, "results/icmp_result.cpp");
+            fillFieldsScanner(receivedPacket, 2, "results/result.cpp");
         }
         else {
             fillFieldsVictim(receivedPacket, 2, "results/result.cpp");
