@@ -275,7 +275,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         std::ofstream outputResult("results/result.cpp");
         if (!outputResult)
         {
-            std::cerr << "Не удалось открыть файлы или result.cpp\n";
+            std::cerr << "Не удалось открыть result.cpp\n";
             return;
         }
         std::string templateContent;
