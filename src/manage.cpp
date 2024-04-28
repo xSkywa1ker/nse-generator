@@ -185,6 +185,10 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
     else if(proto == 67){
         callDHCP(true, receivedPacket, appData);
     }
+    else if (proto == 2){
+        callICMP(true, receivedPacket, appData);
+    }
+
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -219,6 +223,9 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
     }
     else if(proto == 67){
         callDHCP(false, receivedPacket, appData);
+    }
+    else if (proto == 2){
+        callICMP(false, receivedPacket, appData);
     }
 
     // Ищем позицию закрывающей фигурной скобки
@@ -325,10 +332,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         std::cout << "Копирование и вставка завершены\n";
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            //fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
+            fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
         }
         else {
-            //fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
+            fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
         }
     }
     else if(proto == 17){
