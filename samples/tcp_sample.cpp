@@ -1,3 +1,5 @@
+
+
 int clientSocket;
 
 // Структура для заголовка IP пакета
@@ -27,7 +29,7 @@ struct TcpHeader {
     u_short urgentPointer;
 };
 
-struct ReceivedPacket {
+struct ReceivedTCPPacket {
     TcpHeader tcpHeader;
     u_char flags;
     int sourcePort;

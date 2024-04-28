@@ -248,7 +248,18 @@ void fillTCPPacket(const u_char *receivedPacket)
     th->th_sum = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&th), sizeof(tcp_header)));
 }
 
-// теперь это не менеджер, а анализатор и надо сделать большой рефаторинг кода: декомпозицию компонент чтобы не дублировать код для каждого протокола
+void copyFileToString(const std::string& filename, std::string& content) {
+    std::ifstream inputFile(filename);
+    if (!inputFile) {
+        std::cerr << "Не удалось открыть файл " << filename << std::endl;
+        return;
+    }
+
+    std::ostringstream buffer;
+    buffer << inputFile.rdbuf(); // Считываем содержимое файла в буфер
+    content = buffer.str();      // Преобразуем содержимое буфера в строку
+    inputFile.close();
+}
 
 void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 {
@@ -272,43 +283,46 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
     if (ip_hdr->proto == 6)
     {
         tcp_header *tcpHeader = (tcp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) << 2));
-        std::ofstream outputResult("results/result.cpp");
-        if (!outputResult)
+        std::ifstream copyResult("results/result.cpp");
+        if (!copyResult)
         {
             std::cerr << "Не удалось открыть result.cpp\n";
             return;
         }
         std::string templateContent;
+        copyFileToString("samples/tcp_sample.cpp", templateContent);
+
+        // Открываем результирующий файл для записи
+        std::ofstream outputFile("results/result.cpp", std::ios::app);
+        if (!outputFile) {
+            std::cerr << "Не удалось открыть файл results/result.cpp для записи\n";
+            return;
+        }
+
+        // Ищем позицию последнего вхождения инструкции #include в результирующем файле
+        size_t lastIncludePos = outputFile.tellp();
+        outputFile.seekp(0, std::ios_base::end);
+        std::string outputResultContent;
+        if (lastIncludePos != 0) {
+            outputFile.seekp(lastIncludePos);
+            outputResultContent.resize(outputFile.tellp());
+            outputFile.seekp(lastIncludePos);
+        }
+
+        // Проверяем, был ли уже скопирован шаблон TCP
         if (!templateFlag.tcpCopied) {
-            std::ifstream inputTemplate("samples/tcp_sample.cpp");
-            if (!inputTemplate) {
-                std::cerr << "Не удалось открыть файл tcp_sample.cpp\n";
-                return;
-            }
-
-            std::ostringstream outputResultBuffer;
-            outputResultBuffer << outputResult.rdbuf();  // Считываем содержимое файла вывода в строковый буфер
-            std::string outputResultContent = outputResultBuffer.str();
-
-            std::ostringstream buffer;
-            buffer << inputTemplate.rdbuf();
-            templateContent = buffer.str();
-            inputTemplate.close();
-
-            // Ищем позицию последнего вхождения инструкции #include
-            size_t lastIncludePos = outputResultContent.rfind("#include");
-            if (lastIncludePos != std::string::npos) {
-                // Вставляем содержимое шаблона после последнего #include
-                outputResult.seekp(lastIncludePos + 8); // Смещаемся на конец #include
-                outputResult << "\n" << templateContent;
+            // Вставляем содержимое шаблона после последнего #include
+            if (!outputResultContent.empty() && outputResultContent.find("#include") != std::string::npos) {
+                outputFile << "\n" << templateContent;
             } else {
-                // Если инструкция #include не найдена, просто вставляем в конец файла
-                outputResult.seekp(0, std::ios_base::end);
-                outputResult << "\n" << templateContent;
+                outputFile << templateContent;
             }
             templateFlag.tcpCopied = true;
-            outputResult.close();
         }
+
+        outputFile.close();
+
+        std::cout << "Копирование и вставка завершены\n";
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
             //fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
