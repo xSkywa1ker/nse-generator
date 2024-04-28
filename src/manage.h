@@ -4,6 +4,8 @@
 
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue);
 
-void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isLast);
+void analizer(const u_char *receivedPacket, bool is_scanner, int proto);
+
+void putMainIntoResult(const std::string &outputFile);
 
 #endif //LUA_SCRIPT_GENERATOR_MANAGE_H

@@ -259,7 +259,7 @@ void copyFileToString(const std::string& filename, std::string& content) {
     inputFile.close();
 }
 
-void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isLast)
+void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 {
     if (templateFlag.firstCopied){
         std::ifstream inputTemplate("samples/includes.cpp");
@@ -374,9 +374,6 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isL
         else {
             fillFieldsVictim(receivedPacket, 2);
         }
-    }
-    if (isLast){
-        putMainIntoResult("results/result.cpp");
     }
 }
 
