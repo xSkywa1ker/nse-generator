@@ -22,15 +22,16 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
 
     std::vector<std::vector<unsigned char*>> packets;  // Вектор для хранения информации о пакетах
 
-    struct pcap_pkthdr header;
+    struct pcap_pkthdr *header;
     const u_char *packetData;
     bool isLast = false;
+    int returnValue;
     do {
         returnValue = pcap_next_ex(handle, &header, &packetData);
         if(returnValue == 1){
             isLast = true;
         }
-        if (header.caplen >= 14) {
+        if (header->caplen >= 14) {
             const uint16_t etherType = (packetData[12] << 8) | packetData[13];
             if (etherType == 0x0806) {
                 std::cout << "ARP ";

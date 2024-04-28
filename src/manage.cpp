@@ -323,10 +323,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isL
         std::cout << "Копирование и вставка завершены\n";
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
+            fillFieldsScanner(receivedPacket, 6);
         }
         else {
-            fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
+            fillFieldsVictim(receivedPacket, 6);
         }
     }
     else if(proto == 17){
@@ -346,10 +346,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isL
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 17, "results/result.cpp");
+            fillFieldsScanner(receivedPacket, 17);
         }
         else {
-            fillFieldsVictim(receivedPacket, 17, "results/result.cpp");
+            fillFieldsVictim(receivedPacket, 17);
         }
     }
     else if (proto == 2){
@@ -369,10 +369,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto, bool isL
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 2, "results/result.cpp");
+            fillFieldsScanner(receivedPacket, 2);
         }
         else {
-            fillFieldsVictim(receivedPacket, 2, "results/result.cpp");
+            fillFieldsVictim(receivedPacket, 2);
         }
     }
     if (isLast){
