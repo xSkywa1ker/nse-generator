@@ -260,6 +260,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
             std::cerr << "Не удалось открыть файл result.cpp\n";
             return;
         }
+        else {
+            std::cout << "Файлы с include успешно открыты\n";
+        }
         outputResult << inputTemplate.rdbuf();
         templateFlag.firstCopied = false;
         inputTemplate.close();
@@ -269,12 +272,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
     if (ip_hdr->proto == 6)
     {
         tcp_header *tcpHeader = (tcp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) << 2));
-        std::ifstream inputTemplate("samples/tcp_sample.cpp");
         std::ofstream outputResult("results/result.cpp");
-
-        if (!inputTemplate || !outputResult)
+        if (!outputResult)
         {
-            std::cerr << "Не удалось открыть файлы tcp_sample.cpp или result.cpp\n";
+            std::cerr << "Не удалось открыть файлы или result.cpp\n";
             return;
         }
         std::string templateContent;
@@ -310,10 +311,10 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
         }
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
+            //fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
         }
         else {
-            fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
+            //fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
         }
     }
     else if(proto == 17){
