@@ -1,14 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <pcap.h>
-
 #define PACKET_SIZE 64
 #define ICMP_PACKET_SIZE 56
 #define ICMP_DATA "Hello, ICMP!"
@@ -131,14 +120,4 @@ void receive_icmp_packet() {
 
     printf("ICMP Data:\n");
     printf(" - %s\n", received_packets[0] + (ip_header->ip_hl << 2) + sizeof(struct icmp));
-}
-
-int main() {
-    const char *destination_ip = "127.0.0.1";
-
-    // Отправка и получение ICMP пакетов
-    send_and_receive_icmp_packet(destination_ip);
-    receive_icmp_packet();
-
-    return 0;
 }
