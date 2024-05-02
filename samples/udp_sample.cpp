@@ -15,8 +15,41 @@ struct ReceivedPacket {
 
 std::vector<ReceivedPacket> receivedPackets;
 
-// Функция отправки UDP пакета
-void send_udp_packet(int source_port, int dest_port,  size_t dataLength, const char* data) {
+_short calculate_checksum(const char* data, size_t length) {
+    u_long sum = 0;
+    while (length > 1) {
+        sum += *((u_short*)data);
+        data += 2;
+        length -= 2;
+    }
+    if (length > 0) {
+        sum += *((u_char*)data);
+    }
+    while (sum >> 16) {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+    sum = ~sum;
+    return (u_short)sum;
+}
+
+void send_udp_packet(int source_port, int dest_port, size_t dataLength, const char* data) {
+    // Кодирование UDP заголовка
+    UdpHeader udpHeader;
+    udpHeader.sourcePort = htons(source_port);
+    udpHeader.destinationPort = htons(dest_port);
+    udpHeader.length = htons(sizeof(UdpHeader) + dataLength);
+    udpHeader.checksum = 0; // Здесь будет вычислено значение контрольной суммы позже
+
+    // Создание буфера для UDP пакета
+    char buffer[sizeof(UdpHeader) + dataLength];
+    memcpy(buffer, &udpHeader, sizeof(UdpHeader));
+    memcpy(buffer + sizeof(UdpHeader), data, dataLength);
+
+    // Вычисление контрольной суммы и установка в заголовок
+    udpHeader.checksum = calculate_checksum(buffer, sizeof(UdpHeader) + dataLength);
+    memcpy(buffer, &udpHeader, sizeof(UdpHeader)); // Обновляем заголовок с правильной контрольной суммой
+
+    // Отправка пакета
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     const char* ipAddress = "192.168.3.10";
@@ -32,8 +65,9 @@ void send_udp_packet(int source_port, int dest_port,  size_t dataLength, const c
 
     clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
-    sendto(clientSocket, data, dataLength, 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+    sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
 }
+
 
 // Функция принятия UDP пакета
 void receive_udp_packet(int listen_port) {

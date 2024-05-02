@@ -160,4 +160,49 @@ void listen_tcp_packet(int dest_port, u_char expectedFlags) {
     }
     printf("No packet with expected flags: 0x%02x found\n", expectedFlags);
 
+}int main() {
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	listen_tcp_packet(10659, 0x00);
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
+	send_tcp_packet(69, 12, 10747, 210050,10659, 0x00 );
+	listen_tcp_packet(10659, 0x00);
 }
