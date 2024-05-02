@@ -93,6 +93,17 @@ typedef struct icmp_header {
     uint16_t sequenceNumber;
 } icmp_header;
 
+struct TemplateFlag {
+    bool firstCopied = true;
+    bool tcpCopied = false;
+    bool udpCopied = false;
+    bool icmpCopied = false;
+    bool dhcpCopied = false;
+    bool arpCopied = false;
+};
+
+TemplateFlag templateFlag;
+
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 int HEX_TO_DEC(const std::string &st);
 
@@ -110,7 +121,6 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData){
     else {
         std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
                      HEX_TO_DEC(std::to_string(ntohs(th->dport))), th->th_flags);
-
     }
 }
 
@@ -155,14 +165,22 @@ void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
     }
 }
 
-void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::string &outputFile)
-{
+void putMainIntoResult(const std::string &outputFile){
     std::ofstream output(outputFile, std::ios_base::app);
     if (!output)
     {
         std::cerr << "Не удалось открыть файл для записи\n";
         return;
     }
+
+    output << var;
+    output.close();
+
+    std::cout << "Программа успешно выполнена\n";
+}
+
+void fillFieldsScanner(const u_char *receivedPacket, int proto)
+{
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6){
@@ -174,6 +192,10 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
     else if(proto == 67){
         callDHCP(true, receivedPacket, appData);
     }
+    else if (proto == 2){
+        callICMP(true, receivedPacket, appData);
+    }
+
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -183,21 +205,10 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto, const std::strin
         // Вставляем данные перед закрывающей фигурной скобкой
         var.insert(pos, appData);
     }
-
-    output << var;
-    output.close();
-
-    std::cout << "Программа успешно выполнена\n";
 }
 
-void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string &outputFile)
+void fillFieldsVictim(const u_char *receivedPacket, int proto)
 {
-    std::ofstream output(outputFile, std::ios_base::app);
-    if (!output)
-    {
-        std::cerr << "Не удалось открыть файл для записи\n";
-        return;
-    }
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6){
@@ -209,6 +220,9 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
     else if(proto == 67){
         callDHCP(false, receivedPacket, appData);
     }
+    else if (proto == 2){
+        callICMP(false, receivedPacket, appData);
+    }
 
     // Ищем позицию закрывающей фигурной скобки
     size_t pos = var.rfind("}");
@@ -218,11 +232,6 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto, const std::string
         // Вставляем данные перед закрывающей фигурной скобкой
         var.insert(pos, appData);
     }
-
-    output << var;
-    output.close();
-
-    std::cout << "Программа успешно выполнена\n";
 }
 
 void fillTCPPacket(const u_char *receivedPacket)
@@ -237,71 +246,133 @@ void fillTCPPacket(const u_char *receivedPacket)
     th->th_sum = htons(pcap_in_cksum(reinterpret_cast<unsigned short *>(&th), sizeof(tcp_header)));
 }
 
-// теперь это не менеджер, а анализатор и надо сделать большой рефаторинг кода: декомпозицию компонент чтобы не дублировать код для каждого протокола
+void copyFileToString(const std::string& filename, std::string& content) {
+    std::ifstream inputFile(filename);
+    if (!inputFile) {
+        std::cerr << "Не удалось открыть файл " << filename << std::endl;
+        return;
+    }
+
+    std::ostringstream buffer;
+    buffer << inputFile.rdbuf(); // Считываем содержимое файла в буфер
+    content = buffer.str();      // Преобразуем содержимое буфера в строку
+    inputFile.close();
+}
 
 void analizer(const u_char *receivedPacket, bool is_scanner, int proto)
 {
+    if (templateFlag.firstCopied){
+        std::ifstream inputTemplate("samples/includes.cpp");
+        std::ofstream outputResult("results/result.cpp");
+        if (!inputTemplate || !outputResult)
+        {
+            std::cerr << "Не удалось открыть файл result.cpp\n";
+            return;
+        }
+        else {
+            std::cout << "Файлы с include успешно открыты\n";
+        }
+        outputResult << inputTemplate.rdbuf();
+        templateFlag.firstCopied = false;
+        inputTemplate.close();
+        outputResult.close();
+    }
     ip_header* ip_hdr = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     if (ip_hdr->proto == 6)
     {
         tcp_header *tcpHeader = (tcp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) << 2));
-        std::ifstream inputTemplate("samples/tcp_sample.cpp");
-        std::ofstream outputResult("results/result.cpp");
-
-        if (!inputTemplate || !outputResult)
+        std::ifstream copyResult("results/result.cpp");
+        if (!copyResult)
         {
-            std::cerr << "Не удалось открыть файлы tcp_sample.cpp или result.cpp\n";
+            std::cerr << "Не удалось открыть result.cpp\n";
             return;
         }
-        outputResult << inputTemplate.rdbuf();
-        inputTemplate.close();
-        outputResult.close();
+        std::string templateContent;
+        copyFileToString("samples/tcp_sample.cpp", templateContent);
+
+        // Открываем результирующий файл для записи
+        std::ofstream outputFile("results/result.cpp", std::ios::app);
+        if (!outputFile) {
+            std::cerr << "Не удалось открыть файл results/result.cpp для записи\n";
+            return;
+        }
+
+        // Ищем позицию последнего вхождения инструкции #include в результирующем файле
+        size_t lastIncludePos = outputFile.tellp();
+        outputFile.seekp(0, std::ios_base::end);
+        std::string outputResultContent;
+        if (lastIncludePos != 0) {
+            outputFile.seekp(lastIncludePos);
+            outputResultContent.resize(outputFile.tellp());
+            outputFile.seekp(lastIncludePos);
+        }
+
+        // Проверяем, был ли уже скопирован шаблон TCP
+        if (!templateFlag.tcpCopied) {
+            // Вставляем содержимое шаблона после последнего #include
+            if (!outputResultContent.empty() && outputResultContent.find("#include") != std::string::npos) {
+                outputFile << "\n" << templateContent;
+            } else {
+                outputFile << templateContent;
+            }
+            templateFlag.tcpCopied = true;
+        }
+
+        outputFile.close();
+
+        std::cout << "Копирование и вставка завершены\n";
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 6, "results/result.cpp");
+            fillFieldsScanner(receivedPacket, 6);
         }
         else {
-            fillFieldsVictim(receivedPacket, 6, "results/result.cpp");
+            fillFieldsVictim(receivedPacket, 6);
         }
     }
     else if(proto == 17){
         udp_header *udpHeader = (udp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
         std::ifstream inputTemplate("samples/udp_sample.cpp");
-        std::ofstream outputResult("results/udp_result.cpp");
+        std::ofstream outputResult("results/result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
-            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            std::cerr << "Не удалось открыть файлы udp_sample.cpp или result.cpp\n";
             return;
         }
-        outputResult << inputTemplate.rdbuf();
+        if (!templateFlag.udpCopied) {
+            outputResult << inputTemplate.rdbuf();
+            templateFlag.udpCopied = true;
+        }
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 17, "results/udp_result.cpp");
+            fillFieldsScanner(receivedPacket, 17);
         }
         else {
-            fillFieldsVictim(receivedPacket, 17, "results/udp_result.cpp");
+            fillFieldsVictim(receivedPacket, 17);
         }
     }
     else if (proto == 2){
         icmp_header *icmpHeader = (icmp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
         std::ifstream inputTemplate("samples/icmp_sample.cpp");
-        std::ofstream outputResult("result/icmp_result.cpp");
+        std::ofstream outputResult("result/result.cpp");
 
         if (!inputTemplate || !outputResult)
         {
-            std::cerr << "Не удалось открыть файлы udp_sample.cpp или udp_sample.cpp\n";
+            std::cerr << "Не удалось открыть файлы icmp_sample.cpp или result.cpp\n";
             return;
         }
-        outputResult << inputTemplate.rdbuf();
+        if (!templateFlag.icmpCopied) {
+            outputResult << inputTemplate.rdbuf();
+            templateFlag.icmpCopied = true;
+        }
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 2, "results/icmp_result.cpp");
+            fillFieldsScanner(receivedPacket, 2);
         }
         else {
-            fillFieldsVictim(receivedPacket, 2, "results/icmp_result.cpp");
+            fillFieldsVictim(receivedPacket, 2);
         }
     }
 }

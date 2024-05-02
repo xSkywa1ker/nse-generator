@@ -1,10 +1,4 @@
-#include <iostream>
-#include <cstring>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <vector>
+
 
 int clientSocket;
 
@@ -35,7 +29,7 @@ struct TcpHeader {
     u_short urgentPointer;
 };
 
-struct ReceivedPacket {
+struct ReceivedTCPPacket {
     TcpHeader tcpHeader;
     u_char flags;
     int sourcePort;
