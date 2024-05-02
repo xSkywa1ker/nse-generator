@@ -47,7 +47,7 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
         perror("Error creating socket");
         return;
     }
-
+    std::cout  << "FLAG" << std::endl;
     // Заполнение структуры с информацией об адресе сервера
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
@@ -61,7 +61,7 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     udpHeader.destinationPort = htons(dest_port);
     udpHeader.length = htons(sizeof(UdpHeader) + dataLength);
     udpHeader.checksum = 0; // Здесь будет вычислено значение контрольной суммы позже
-
+    std::cout  << "FLAG" << std::endl;
     // Создание буфера для UDP пакета
     char buffer[sizeof(UdpHeader) + dataLength];
     memcpy(buffer, &udpHeader, sizeof(UdpHeader));
@@ -76,9 +76,9 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     memset(&destAddress, 0, sizeof(destAddress));
     destAddress.sin_family = AF_INET;
     destAddress.sin_addr.s_addr = inet_addr(dest_ip);
-
+    std::cout  << "FLAG" << std::endl;
     sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&destAddress, sizeof(destAddress));
-
+    std::cout  << "FLAG1" << std::endl;
     // Получение UDP пакетов
     struct sockaddr_in clientAddress;
     socklen_t addrLen = sizeof(clientAddress);
@@ -114,10 +114,10 @@ void receive_udp_packet() {
 
 int main() {
     const char* data = "Hello, UDP!";
-    const int source_port = 12345; // Замените на нужный порт
+    const int source_port = 54321; // Замените на нужный порт
     const int dest_port = 54321; // Замените на нужный порт
     const char* source_ip = "127.0.0.1"; // Замените на нужный IP адрес
-    const char* dest_ip = "127.0.0.1"; // Замените на нужный IP адрес
+    const char* dest_ip = "192.168.32.1"; // Замените на нужный IP адрес
 
     // Отправка и получение UDP пакетов
     send_and_receive_udp_packet(source_port, dest_port, source_ip, dest_ip, strlen(data), data);
