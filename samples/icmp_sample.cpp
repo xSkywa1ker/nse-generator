@@ -134,7 +134,7 @@ void receive_icmp_packet() {
 }
 
 int main() {
-    const char *destination_ip = "127.0.0.1"; // Замените на нужный IP адрес
+    const char *destination_ip = "127.0.0.1";
 
     // Отправка и получение ICMP пакетов
     send_and_receive_icmp_packet(destination_ip);
