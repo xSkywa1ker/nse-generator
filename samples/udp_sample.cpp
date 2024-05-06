@@ -8,7 +8,6 @@
 
 #define MAX_PACKETS 100
 
-// Структура для заголовка UDP пакета
 struct UdpHeader {
     u_short sourcePort;
     u_short destinationPort;
@@ -25,20 +24,20 @@ std::vector<ReceivedPacket> receivedPackets;
 
 unsigned short calculate_checksum(const char* data, size_t length) {
     unsigned long sum = 0;
+    const unsigned short* ptr = (const unsigned short*)data;
     while (length > 1) {
-        sum += *((unsigned short*)data);
-        data += 2;
+        sum += *ptr++;
         length -= 2;
     }
     if (length > 0) {
-        sum += *((unsigned char*)data);
+        sum += *((unsigned char*)ptr);
     }
     while (sum >> 16) {
         sum = (sum & 0xFFFF) + (sum >> 16);
     }
-    sum = ~sum;
-    return (unsigned short)sum;
+    return ~sum;
 }
+
 
 void send_and_receive_udp_packet(int source_port, int dest_port, const char* source_ip, const char* dest_ip, size_t dataLength, const char* data) {
     // Создание сокета
@@ -55,23 +54,19 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     serverAddress.sin_port = htons(dest_port);
     serverAddress.sin_addr.s_addr = inet_addr(dest_ip);
 
-    // Отправка UDP пакета
     UdpHeader udpHeader;
     udpHeader.sourcePort = htons(source_port);
     udpHeader.destinationPort = htons(dest_port);
     udpHeader.length = htons(sizeof(UdpHeader) + dataLength);
-    udpHeader.checksum = 0; // Здесь будет вычислено значение контрольной суммы позже
+    udpHeader.checksum = 0;
     std::cout  << "FLAG" << std::endl;
-    // Создание буфера для UDP пакета
     char buffer[sizeof(UdpHeader) + dataLength];
     memcpy(buffer, &udpHeader, sizeof(UdpHeader));
     memcpy(buffer + sizeof(UdpHeader), data, dataLength);
 
-    // Вычисление контрольной суммы и установка в заголовок
     udpHeader.checksum = calculate_checksum(buffer, sizeof(UdpHeader) + dataLength);
-    memcpy(buffer, &udpHeader, sizeof(UdpHeader)); // Обновляем заголовок с правильной контрольной суммой
+    memcpy(buffer, &udpHeader, sizeof(UdpHeader));
 
-    // Отправка пакета
     struct sockaddr_in destAddress;
     memset(&destAddress, 0, sizeof(destAddress));
     destAddress.sin_family = AF_INET;
@@ -79,22 +74,18 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     std::cout  << "FLAG" << std::endl;
     sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&destAddress, sizeof(destAddress));
     std::cout  << "FLAG1" << std::endl;
-    // Получение UDP пакетов
+
     struct sockaddr_in clientAddress;
     socklen_t addrLen = sizeof(clientAddress);
-    char receivedBuffer[1024]; // Буфер для приема данных
+    char receivedBuffer[1024];
 
-    // Получение данных
     int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
     if (bytesReceived > 0) {
-        // Обработка полученных данных
         ReceivedPacket receivedPacket;
         memcpy(&receivedPacket.udpHeader, receivedBuffer, sizeof(UdpHeader));
         receivedPacket.sourcePort = ntohs(clientAddress.sin_port);
         receivedPackets.push_back(receivedPacket);
     }
-
-    // Закрытие сокета
     close(clientSocket);
 }
 
@@ -103,8 +94,6 @@ void receive_udp_packet() {
         std::cout << "No UDP packets received." << std::endl;
         return;
     }
-
-    // Вывод полей первого пакета из массива
     ReceivedPacket& receivedPacket = receivedPackets[0];
     std::cout << "Source Port: " << ntohs(receivedPacket.sourcePort) << std::endl;
     std::cout << "Destination Port: " << ntohs(receivedPacket.udpHeader.destinationPort) << std::endl;
@@ -114,12 +103,11 @@ void receive_udp_packet() {
 
 int main() {
     const char* data = "Hello, UDP!";
-    const int source_port = 54321; // Замените на нужный порт
-    const int dest_port = 54321; // Замените на нужный порт
-    const char* source_ip = "127.0.0.1"; // Замените на нужный IP адрес
-    const char* dest_ip = "192.168.32.1"; // Замените на нужный IP адрес
+    const int source_port = 64321;
+    const int dest_port = 64321;
+    const char* source_ip = "192.168.22.136";
+    const char* dest_ip = "192.168.22.137";
 
-    // Отправка и получение UDP пакетов
     send_and_receive_udp_packet(source_port, dest_port, source_ip, dest_ip, strlen(data), data);
     receive_udp_packet();
 

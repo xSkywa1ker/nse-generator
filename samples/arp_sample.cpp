@@ -1,65 +1,102 @@
-// Структура для заголовка ARP пакета
+#include <iostream>
+#include <vector>
+#include <cstring>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <net/if_arp.h>
+
+#define MAX_PACKETS 100
+
 struct ArpHeader {
-    uint16_t hardwareType;
-    uint16_t protocolType;
-    uint8_t hardwareSize;
-    uint8_t protocolSize;
-    uint16_t opcode;
-    uint8_t senderMac[6];
-    uint32_t senderIp;
-    uint8_t targetMac[6];
-    uint32_t targetIp;
+    u_short hardwareType;
+    u_short protocolType;
+    u_char hardwareSize;
+    u_char protocolSize;
+    u_short opcode;
+    u_char senderMAC[6];
+    u_char senderIP[4];
+    u_char targetMAC[6];
+    u_char targetIP[4];
 };
 
-struct ReceivedPacket {
+struct ReceivedArpPacket {
     ArpHeader arpHeader;
-    int sourcePort;
 };
 
-std::vector<ReceivedPacket> receivedPackets;
+std::vector<ReceivedArpPacket> receivedArpPackets;
 
-// Функция отправки ARP пакета
-void send_arp_packet(const char* src_mac, uint32_t src_ip, const char* dst_mac, uint32_t dst_ip) {
-    struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
-
+void send_and_receive_arp_packet(const char* source_ip, const char* dest_ip) {
+    // Создание сокета
+    int clientSocket = socket(AF_PACKET, SOCK_PACKET, htons(ETH_P_ARP));
     if (clientSocket < 0) {
         perror("Error creating socket");
         return;
     }
 
-    serverAddress.sin_family = AF_PACKET;
-    // Укажите соответствующий сетевой интерфейс
-    serverAddress.sin_port = htons(0); // Произвольный порт
+    // Заполнение структуры с информацией об ARP запросе
+    ArpHeader arpHeader;
+    arpHeader.hardwareType = htons(ARPHRD_ETHER);
+    arpHeader.protocolType = htons(ETH_P_IP);
+    arpHeader.hardwareSize = 6;
+    arpHeader.protocolSize = 4;
+    arpHeader.opcode = htons(ARPOP_REQUEST);
 
-    // Создание сокета
-    clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
+    // Заполнение MAC и IP адресов отправителя
+    // В реальном приложении эти данные должны быть заполнены с использованием реальных MAC и IP адресов вашего устройства
+    memset(arpHeader.senderMAC, 0xff, 6); // Broadcast MAC
+    inet_pton(AF_INET, source_ip, arpHeader.senderIP);
 
-    // Формирование ARP пакета
-    ArpHeader arpPacket;
-    arpPacket.hardwareType = htons(ARPHRD_ETHER); // Ethernet
-    arpPacket.protocolType = htons(ETH_P_IP);     // IPv4
-    arpPacket.hardwareSize = 6;                  // Размер MAC-адреса
-    arpPacket.protocolSize = 4;                  // Размер IPv4-адреса
-    arpPacket.opcode = htons(ARPOP_REQUEST);      // ARP запрос
+    // Заполнение MAC адреса получателя
+    memset(arpHeader.targetMAC, 0, 6); // Unknown MAC
+    inet_pton(AF_INET, dest_ip, arpHeader.targetIP);
 
+    // Отправка ARP запроса
+    struct sockaddr addr;
+    memset(&addr, 0, sizeof(addr));
+    strcpy(addr.sa_data, "eth0"); // Укажите имя сетевого интерфейса, с которого отправляется пакет
+
+    sendto(clientSocket, &arpHeader, sizeof(ArpHeader), 0, &addr, sizeof(addr));
+
+    // Получение ARP ответов
+    char receivedBuffer[1024];
+    while (true) {
+        int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, NULL, NULL);
+        if (bytesReceived > 0) {
+            // Обработка полученных данных
+            ReceivedArpPacket receivedArpPacket;
+            memcpy(&receivedArpPacket.arpHeader, receivedBuffer, sizeof(ArpHeader));
+            receivedArpPackets.push_back(receivedArpPacket);
+
+            // Вывод полей ARP пакета
+            std::cout << "ARP Response Received:" << std::endl;
+            std::cout << "Sender MAC: ";
+            for (int i = 0; i < 6; ++i) {
+                printf("%02X ", receivedArpPacket.arpHeader.senderMAC[i]);
+            }
+            std::cout << std::endl;
+
+            std::cout << "Sender IP: ";
+            for (int i = 0; i < 4; ++i) {
+                std::cout << (int)receivedArpPacket.arpHeader.senderIP[i] << ".";
+            }
+            std::cout << std::endl;
+
+            // Другие поля ARP пакета могут быть обработаны аналогичным образом
+        }
+    }
+
+    // Закрытие сокета
+    close(clientSocket);
 }
 
-// Функция принятия ARP пакета
-void receive_arp_packet() {
-    struct sockaddr_in clientAddress;
-    socklen_t addrLen = sizeof(clientAddress);
-    char buffer[1024]; // Буфер для приёма данных
+int main() {
+    const char* source_ip = "192.168.1.2"; // Замените на IP адрес вашего устройства
+    const char* dest_ip = "192.168.1.1"; // Замените на IP адрес устройства, которое вы хотите запросить
 
-    // Создание сокета
-    int serverSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
+    // Отправка ARP запроса и получение ответов
+    send_and_receive_arp_packet(source_ip, dest_ip);
 
-    // Получение данных
-    recvfrom(serverSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
-
-    // Обработка полученных данных
-    ReceivedPacket receivedPacket;
-    // Заполнение receivedPacket данными из буфера, если необходимо
-
-    receivedPackets.push_back(receivedPacket);
+    return 0;
 }
