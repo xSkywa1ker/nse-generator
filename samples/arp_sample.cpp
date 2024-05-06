@@ -27,7 +27,30 @@ struct ReceivedArpPacket {
 
 std::vector<ReceivedArpPacket> receivedArpPackets;
 
-void send_and_receive_arp_packet(const char* source_ip, const char* dest_ip) {
+void process_received_arp_packets() {
+    if (receivedArpPackets.empty()) {
+        std::cout << "No ARP packets received." << std::endl;
+        return;
+    }
+
+    // Process ARP packets in the array
+    for (const auto& receivedArpPacket : receivedArpPackets) {
+        std::cout << "ARP Response Received:" << std::endl;
+        std::cout << "Sender MAC: ";
+        for (int i = 0; i < 6; ++i) {
+            printf("%02X ", receivedArpPacket.arpHeader.senderMAC[i]);
+        }
+        std::cout << std::endl;
+
+        std::cout << "Sender IP: ";
+        for (int i = 0; i < 4; ++i) {
+            std::cout << (int)receivedArpPacket.arpHeader.senderIP[i] << ".";
+        }
+        std::cout << std::endl;
+    }
+}
+
+void send_and_receive_arp_packet(const char* source_mac, const char* source_ip, const char* target_mac, const char* target_ip, const char* interface) {
     // Создание сокета
     int clientSocket = socket(AF_PACKET, SOCK_PACKET, htons(ETH_P_ARP));
     if (clientSocket < 0) {
@@ -35,7 +58,6 @@ void send_and_receive_arp_packet(const char* source_ip, const char* dest_ip) {
         return;
     }
 
-    // Заполнение структуры с информацией об ARP запросе
     ArpHeader arpHeader;
     arpHeader.hardwareType = htons(ARPHRD_ETHER);
     arpHeader.protocolType = htons(ETH_P_IP);
@@ -43,60 +65,43 @@ void send_and_receive_arp_packet(const char* source_ip, const char* dest_ip) {
     arpHeader.protocolSize = 4;
     arpHeader.opcode = htons(ARPOP_REQUEST);
 
-    // Заполнение MAC и IP адресов отправителя
-    // В реальном приложении эти данные должны быть заполнены с использованием реальных MAC и IP адресов вашего устройства
-    memset(arpHeader.senderMAC, 0xff, 6); // Broadcast MAC
+    sscanf(source_mac, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx",
+           &arpHeader.senderMAC[0], &arpHeader.senderMAC[1], &arpHeader.senderMAC[2],
+           &arpHeader.senderMAC[3], &arpHeader.senderMAC[4], &arpHeader.senderMAC[5]);
     inet_pton(AF_INET, source_ip, arpHeader.senderIP);
 
-    // Заполнение MAC адреса получателя
-    memset(arpHeader.targetMAC, 0, 6); // Unknown MAC
-    inet_pton(AF_INET, dest_ip, arpHeader.targetIP);
+    sscanf(target_mac, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx",
+           &arpHeader.targetMAC[0], &arpHeader.targetMAC[1], &arpHeader.targetMAC[2],
+           &arpHeader.targetMAC[3], &arpHeader.targetMAC[4], &arpHeader.targetMAC[5]);
+    inet_pton(AF_INET, target_ip, arpHeader.targetIP);
 
-    // Отправка ARP запроса
     struct sockaddr addr;
     memset(&addr, 0, sizeof(addr));
-    strcpy(addr.sa_data, "eth0"); // Укажите имя сетевого интерфейса, с которого отправляется пакет
+    strcpy(addr.sa_data, interface); // Укажите имя сетевого интерфейса, с которого отправляется пакет
 
     sendto(clientSocket, &arpHeader, sizeof(ArpHeader), 0, &addr, sizeof(addr));
 
-    // Получение ARP ответов
     char receivedBuffer[1024];
-    while (true) {
+    while (receivedArpPackets.size() < MAX_PACKETS) {
         int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, NULL, NULL);
         if (bytesReceived > 0) {
-            // Обработка полученных данных
             ReceivedArpPacket receivedArpPacket;
             memcpy(&receivedArpPacket.arpHeader, receivedBuffer, sizeof(ArpHeader));
             receivedArpPackets.push_back(receivedArpPacket);
-
-            // Вывод полей ARP пакета
-            std::cout << "ARP Response Received:" << std::endl;
-            std::cout << "Sender MAC: ";
-            for (int i = 0; i < 6; ++i) {
-                printf("%02X ", receivedArpPacket.arpHeader.senderMAC[i]);
-            }
-            std::cout << std::endl;
-
-            std::cout << "Sender IP: ";
-            for (int i = 0; i < 4; ++i) {
-                std::cout << (int)receivedArpPacket.arpHeader.senderIP[i] << ".";
-            }
-            std::cout << std::endl;
-
-            // Другие поля ARP пакета могут быть обработаны аналогичным образом
         }
     }
-
-    // Закрытие сокета
     close(clientSocket);
 }
 
 int main() {
-    const char* source_ip = "192.168.1.2"; // Замените на IP адрес вашего устройства
-    const char* dest_ip = "192.168.1.1"; // Замените на IP адрес устройства, которое вы хотите запросить
+    const char* source_mac = "00:0c:29:95:c3:64";
+    const char* source_ip = "192.168.22.136";
+    const char* target_mac = "FF:FF:FF:FF:FF:FF";
+    const char* target_ip = "192.168.22.137";
+    const char* interface = "ens33";
 
-    // Отправка ARP запроса и получение ответов
-    send_and_receive_arp_packet(source_ip, dest_ip);
+    send_and_receive_arp_packet(source_mac, source_ip, target_mac, target_ip, interface);
+    process_received_arp_packets();
 
     return 0;
 }
