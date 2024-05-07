@@ -154,7 +154,7 @@ void callICMP(bool isScanner, const u_char *receivedPacket, char *appData){
 }
 
 void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
-    //tcp_header* dhcph = (dhcp*)receivedPacket;
+    //tcp_header* dhcph = (dhcp_header*)receivedPacket;
     if(isScanner) {
         //TODO По аналогии заполнение полей по аналогии с TCP
 
@@ -164,6 +164,22 @@ void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData){
         //TODO По аналогии заполнение полей по аналогии с TCP
     }
 }
+
+void callARP(bool isScanner, const u_char *receivedPacket, char *appData ) {
+    arp_header* ah = (arp_header*)receivedPacket;
+    if(isScanner) {
+        std::sprintf(appData, "\tsend_and_receive_arp_packet(\"%02x:%02x:%02x:%02x:%02x:%02x\", \"%d.%d.%d.%d\", \"%02x:%02x:%02x:%02x:%02x:%02x\", \"%d.%d.%d.%d\", \"%s\");\n",
+                     ah->sender_mac[0], ah->sender_mac[1], ah->sender_mac[2], ah->sender_mac[3], ah->sender_mac[4], ah->sender_mac[5],
+                     ah->sender_ip[0], ah->sender_ip[1], ah->sender_ip[2], ah->sender_ip[3],
+                     ah->target_mac[0], ah->target_mac[1], ah->target_mac[2], ah->target_mac[3], ah->target_mac[4], ah->target_mac[5],
+                     ah->target_ip[0], ah->target_ip[1], ah->target_ip[2], ah->target_ip[3],
+                     interface);
+    }
+    else {
+        // Дополнительная обработка для случая, когда ваше приложение является слушателем ARP пакетов
+    }
+}
+
 
 void putMainIntoResult(const std::string &outputFile){
     std::ofstream output(outputFile, std::ios_base::app);
