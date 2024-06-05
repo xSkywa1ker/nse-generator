@@ -12,4 +12,5 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
 #include <netinet/in.h>
+#include <linux/if_ether.h>
 #include <pcap.h>

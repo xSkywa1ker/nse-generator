@@ -38,7 +38,6 @@ unsigned short calculate_checksum(const char* data, size_t length) {
     return ~sum;
 }
 
-
 void send_and_receive_udp_packet(int source_port, int dest_port, const char* source_ip, const char* dest_ip, size_t dataLength, const char* data) {
     // Создание сокета
     int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -46,7 +45,7 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
         perror("Error creating socket");
         return;
     }
-    std::cout  << "FLAG" << std::endl;
+
     // Заполнение структуры с информацией об адресе сервера
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
@@ -59,7 +58,7 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     udpHeader.destinationPort = htons(dest_port);
     udpHeader.length = htons(sizeof(UdpHeader) + dataLength);
     udpHeader.checksum = 0;
-    std::cout  << "FLAG" << std::endl;
+
     char buffer[sizeof(UdpHeader) + dataLength];
     memcpy(buffer, &udpHeader, sizeof(UdpHeader));
     memcpy(buffer + sizeof(UdpHeader), data, dataLength);
@@ -70,16 +69,38 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     struct sockaddr_in destAddress;
     memset(&destAddress, 0, sizeof(destAddress));
     destAddress.sin_family = AF_INET;
+    destAddress.sin_port = htons(dest_port);  // This line was missing in the original code
     destAddress.sin_addr.s_addr = inet_addr(dest_ip);
-    std::cout  << "FLAG" << std::endl;
-    sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&destAddress, sizeof(destAddress));
-    std::cout  << "FLAG1" << std::endl;
+
+    struct sockaddr_in localAddress;
+    memset(&localAddress, 0, sizeof(localAddress));
+    localAddress.sin_family = AF_INET;
+    localAddress.sin_port = htons(source_port);
+    localAddress.sin_addr.s_addr = inet_addr(source_ip);
+
+    if (bind(clientSocket, (struct sockaddr*)&localAddress, sizeof(localAddress)) < 0) {
+        perror("Error binding socket");
+        close(clientSocket);
+        return;
+    }
+
+    int bytesSent = sendto(clientSocket, buffer, sizeof(UdpHeader) + dataLength, 0, (struct sockaddr*)&destAddress, sizeof(destAddress));
+    if (bytesSent < 0) {
+        perror("Error sending packet");
+        close(clientSocket);
+        return;
+    }
 
     struct sockaddr_in clientAddress;
     socklen_t addrLen = sizeof(clientAddress);
     char receivedBuffer[1024];
 
     int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
+    if (bytesReceived < 0) {
+        perror("Error receiving packet");
+        close(clientSocket);
+        return;
+    }
     if (bytesReceived > 0) {
         ReceivedPacket receivedPacket;
         memcpy(&receivedPacket.udpHeader, receivedBuffer, sizeof(UdpHeader));
@@ -102,14 +123,7 @@ void receive_udp_packet() {
 }
 
 int main() {
-    const char* data = "Hello, UDP!";
-    const int source_port = 64321;
-    const int dest_port = 64321;
-    const char* source_ip = "192.168.22.136";
-    const char* dest_ip = "192.168.22.137";
-
-    send_and_receive_udp_packet(source_port, dest_port, source_ip, dest_ip, strlen(data), data);
+    send_and_receive_udp_packet(65534, 8000, "192.168.91.133", "192.168.91.135", 10, "Hello, UDP!");
     receive_udp_packet();
-
     return 0;
 }

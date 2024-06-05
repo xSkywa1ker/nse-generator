@@ -5,7 +5,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <net/if_arp.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <linux/if_arp.h>  // Include this for ARP constants
 
 #define MAX_PACKETS 100
 
@@ -21,7 +25,14 @@ struct ArpHeader {
     u_char targetIP[4];
 };
 
+struct EthernetHeader {
+    u_char destinationMAC[6];
+    u_char sourceMAC[6];
+    u_short etherType;
+};
+
 struct ReceivedArpPacket {
+    EthernetHeader ethHeader;
     ArpHeader arpHeader;
 };
 
@@ -44,60 +55,98 @@ void process_received_arp_packets() {
 
         std::cout << "Sender IP: ";
         for (int i = 0; i < 4; ++i) {
-            std::cout << (int)receivedArpPacket.arpHeader.senderIP[i] << ".";
+            std::cout << (int)receivedArpPacket.arpHeader.senderIP[i];
+            if (i < 3) std::cout << ".";
         }
         std::cout << std::endl;
     }
 }
 
 void send_and_receive_arp_packet(const char* source_mac, const char* source_ip, const char* target_mac, const char* target_ip, const char* interface) {
-    // Создание сокета
-    int clientSocket = socket(AF_PACKET, SOCK_PACKET, htons(ETH_P_ARP));
+    // Create a raw socket
+    int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
     if (clientSocket < 0) {
         perror("Error creating socket");
         return;
     }
 
+    // Get the interface index
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ-1);
+    if (ioctl(clientSocket, SIOCGIFINDEX, &ifr) < 0) {
+        perror("Error getting interface index");
+        close(clientSocket);
+        return;
+    }
+    int ifindex = ifr.ifr_ifindex;
+
+    // Construct Ethernet header
+    EthernetHeader ethHeader;
+    sscanf(source_mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+           &ethHeader.sourceMAC[0], &ethHeader.sourceMAC[1], &ethHeader.sourceMAC[2],
+           &ethHeader.sourceMAC[3], &ethHeader.sourceMAC[4], &ethHeader.sourceMAC[5]);
+    sscanf(target_mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+           &ethHeader.destinationMAC[0], &ethHeader.destinationMAC[1], &ethHeader.destinationMAC[2],
+           &ethHeader.destinationMAC[3], &ethHeader.destinationMAC[4], &ethHeader.destinationMAC[5]);
+    ethHeader.etherType = htons(ETH_P_ARP);
+
+    // Construct ARP header
     ArpHeader arpHeader;
     arpHeader.hardwareType = htons(ARPHRD_ETHER);
     arpHeader.protocolType = htons(ETH_P_IP);
     arpHeader.hardwareSize = 6;
     arpHeader.protocolSize = 4;
     arpHeader.opcode = htons(ARPOP_REQUEST);
-
-    sscanf(source_mac, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx",
-           &arpHeader.senderMAC[0], &arpHeader.senderMAC[1], &arpHeader.senderMAC[2],
-           &arpHeader.senderMAC[3], &arpHeader.senderMAC[4], &arpHeader.senderMAC[5]);
+    memcpy(arpHeader.senderMAC, ethHeader.sourceMAC, 6);
     inet_pton(AF_INET, source_ip, arpHeader.senderIP);
-
-    sscanf(target_mac, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx",
-           &arpHeader.targetMAC[0], &arpHeader.targetMAC[1], &arpHeader.targetMAC[2],
-           &arpHeader.targetMAC[3], &arpHeader.targetMAC[4], &arpHeader.targetMAC[5]);
+    memcpy(arpHeader.targetMAC, ethHeader.destinationMAC, 6);
     inet_pton(AF_INET, target_ip, arpHeader.targetIP);
 
-    struct sockaddr addr;
-    memset(&addr, 0, sizeof(addr));
-    strcpy(addr.sa_data, interface); // Укажите имя сетевого интерфейса, с которого отправляется пакет
+    // Combine Ethernet and ARP headers
+    char packet[sizeof(EthernetHeader) + sizeof(ArpHeader)];
+    memcpy(packet, &ethHeader, sizeof(EthernetHeader));
+    memcpy(packet + sizeof(EthernetHeader), &arpHeader, sizeof(ArpHeader));
 
-    sendto(clientSocket, &arpHeader, sizeof(ArpHeader), 0, &addr, sizeof(addr));
+    // Set up the sockaddr_ll structure
+    struct sockaddr_ll addr = {};
+    addr.sll_ifindex = ifindex;
+    addr.sll_halen = ETH_ALEN;
+    memcpy(addr.sll_addr, ethHeader.destinationMAC, ETH_ALEN);
 
+    // Send the packet
+    if (sendto(clientSocket, packet, sizeof(packet), 0, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("Error sending packet");
+        close(clientSocket);
+        return;
+    }
+
+    // Receive packets
     char receivedBuffer[1024];
     while (receivedArpPackets.size() < MAX_PACKETS) {
         int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, NULL, NULL);
         if (bytesReceived > 0) {
-            ReceivedArpPacket receivedArpPacket;
-            memcpy(&receivedArpPacket.arpHeader, receivedBuffer, sizeof(ArpHeader));
-            receivedArpPackets.push_back(receivedArpPacket);
+            EthernetHeader* receivedEthHeader = (EthernetHeader*)receivedBuffer;
+            if (ntohs(receivedEthHeader->etherType) == ETH_P_ARP) {
+                ArpHeader* receivedArpHeader = (ArpHeader*)(receivedBuffer + sizeof(EthernetHeader));
+                if (ntohs(receivedArpHeader->opcode) == ARPOP_REPLY) {
+                    ReceivedArpPacket receivedArpPacket;
+                    memcpy(&receivedArpPacket.ethHeader, receivedEthHeader, sizeof(EthernetHeader));
+                    memcpy(&receivedArpPacket.arpHeader, receivedArpHeader, sizeof(ArpHeader));
+                    receivedArpPackets.push_back(receivedArpPacket);
+                }
+            }
         }
     }
+
     close(clientSocket);
 }
 
 int main() {
     const char* source_mac = "00:0c:29:95:c3:64";
-    const char* source_ip = "192.168.22.136";
+    const char* source_ip = "192.168.91.133";
     const char* target_mac = "FF:FF:FF:FF:FF:FF";
-    const char* target_ip = "192.168.22.137";
+    const char* target_ip = "192.168.91.135";
     const char* interface = "ens33";
 
     send_and_receive_arp_packet(source_mac, source_ip, target_mac, target_ip, interface);
