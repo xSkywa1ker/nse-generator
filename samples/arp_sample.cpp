@@ -62,7 +62,13 @@ void process_received_arp_packets() {
     }
 }
 
-void send_and_receive_arp_packet(const char* source_mac, const char* source_ip, const char* target_mac, const char* target_ip, const char* interface) {
+void send_and_receive_arp_packet(
+        const char* source_mac, const char* source_ip,
+        const char* target_mac, const char* target_ip,
+        const char* interface, u_short opcode,
+        u_short hardwareType, u_short protocolType,
+        u_char hardwareSize, u_char protocolSize
+) {
     // Create a raw socket
     int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
     if (clientSocket < 0) {
@@ -93,11 +99,11 @@ void send_and_receive_arp_packet(const char* source_mac, const char* source_ip, 
 
     // Construct ARP header
     ArpHeader arpHeader;
-    arpHeader.hardwareType = htons(ARPHRD_ETHER);
-    arpHeader.protocolType = htons(ETH_P_IP);
-    arpHeader.hardwareSize = 6;
-    arpHeader.protocolSize = 4;
-    arpHeader.opcode = htons(ARPOP_REQUEST);
+    arpHeader.hardwareType = htons(hardwareType);
+    arpHeader.protocolType = htons(protocolType);
+    arpHeader.hardwareSize = hardwareSize;
+    arpHeader.protocolSize = protocolSize;
+    arpHeader.opcode = htons(opcode);
     memcpy(arpHeader.senderMAC, ethHeader.sourceMAC, 6);
     inet_pton(AF_INET, source_ip, arpHeader.senderIP);
     memcpy(arpHeader.targetMAC, ethHeader.destinationMAC, 6);
@@ -148,8 +154,13 @@ int main() {
     const char* target_mac = "FF:FF:FF:FF:FF:FF";
     const char* target_ip = "192.168.91.135";
     const char* interface = "ens33";
+    u_short opcode = ARPOP_REQUEST;
+    u_short hardwareType = ARPHRD_ETHER;
+    u_short protocolType = ETH_P_IP;
+    u_char hardwareSize = 6;
+    u_char protocolSize = 4;
 
-    send_and_receive_arp_packet(source_mac, source_ip, target_mac, target_ip, interface);
+    send_and_receive_arp_packet(source_mac, source_ip, target_mac, target_ip, interface, opcode, hardwareType, protocolType, hardwareSize, protocolSize);
     process_received_arp_packets();
 
     return 0;
