@@ -98,7 +98,9 @@ ipHeader.ip_p = IPPROTO_UDP;
 ipHeader.ip_sum = 0;
 ipHeader.ip_src.s_addr = inet_addr("192.168.91.133");
 ipHeader.ip_dst.s_addr = inet_addr("255.255.255.255");
-ipHeader.ip_sum = calculate_checksum((unsigned short*)&ipHeader, sizeof(ipHeader));
+ipHeader.ip_sum = 0; // Set to zero before calculation
+ipHeader.ip_sum = calculate_checksum((unsigned short*)&ipHeader, ipHeader.ip_hl * 4);
+
 
 // Заполнение UDP заголовка
 struct udphdr udpHeader;
