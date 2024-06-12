@@ -16,7 +16,6 @@
 #define MAX_PACKETS 100
 #define DHCP_MAGIC_COOKIE "\x63\x82\x53\x63"
 
-// Структура для DHCP заголовка
 struct DhcpHeader {
     u_char op;
     u_char htype;
@@ -32,17 +31,15 @@ struct DhcpHeader {
     u_char chaddr[16];
     u_char sname[64];
     u_char file[128];
-    u_char options[312];  // DHCP options
+    u_char options[312];
 };
 
-// Структура для Ethernet заголовка
 struct EthernetHeader {
     u_char dest[6];
     u_char src[6];
     u_short type;
 };
 
-// Функция для вычисления контрольной суммы
 unsigned short calculate_checksum(unsigned short *buffer, int size) {
     unsigned long cksum = 0;
     while (size > 1) {
@@ -57,19 +54,15 @@ unsigned short calculate_checksum(unsigned short *buffer, int size) {
     return (unsigned short) (~cksum);
 }
 
-// Функция для отправки DHCP пакета и прослушивания ответов
-std::vector<std::vector<u_char>> send_and_receive_dhcp_packet(const char *interface, const char *source_mac, const char *client_mac, u_int32_t client_ip,
+std::vector<std::vector<u_char>> send_and_receive_dhcp_packet(const char *interface, const char *source_mac, const char *client_mac,
                                                               const std::vector<std::pair<u_char, std::vector<u_char>>>& options) {
 std::vector<std::vector<u_char>> received_packets;
-
-// Создание сокета для отправки и получения пакетов
 int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 if (clientSocket < 0) {
 perror("Error creating socket");
 return received_packets;
 }
 
-// Получение индекса интерфейса
 struct ifreq ifr;
 memset(&ifr, 0, sizeof(ifr));
 strncpy(ifr.ifr_name, interface, IFNAMSIZ - 1);
@@ -79,13 +72,13 @@ close(clientSocket);
 return received_packets;
 }
 
-// Заполнение Ethernet заголовка
 EthernetHeader ethHeader;
-sscanf(source_mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ethHeader.src[0], &ethHeader.src[1], &ethHeader.src[2], &ethHeader.src[3], &ethHeader.src[4], &ethHeader.src[5]);
-sscanf("00:50:56:f9:3a:16", "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ethHeader.dest[0], &ethHeader.dest[1], &ethHeader.dest[2], &ethHeader.dest[3], &ethHeader.dest[4], &ethHeader.dest[5]);
+sscanf(source_mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ethHeader.src[0], &ethHeader.src[1], &ethHeader.src[2],
+&ethHeader.src[3], &ethHeader.src[4], &ethHeader.src[5]);
+sscanf("ff:ff:ff:ff:ff:ff", "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ethHeader.dest[0], &ethHeader.dest[1], &ethHeader.dest[2],
+&ethHeader.dest[3], &ethHeader.dest[4], &ethHeader.dest[5]);
 ethHeader.type = htons(ETH_P_IP);
 
-// Заполнение IP заголовка
 struct ip ipHeader;
 ipHeader.ip_hl = 5;
 ipHeader.ip_v = 4;
@@ -95,71 +88,60 @@ ipHeader.ip_id = htons(1);
 ipHeader.ip_off = 0;
 ipHeader.ip_ttl = 64;
 ipHeader.ip_p = IPPROTO_UDP;
-ipHeader.ip_sum = 0;
-ipHeader.ip_src.s_addr = inet_addr("192.168.91.133");
+ipHeader.ip_src.s_addr = htonl(INADDR_ANY);
 ipHeader.ip_dst.s_addr = inet_addr("255.255.255.255");
-ipHeader.ip_sum = 0; // Set to zero before calculation
+ipHeader.ip_sum = 0;
 ipHeader.ip_sum = calculate_checksum((unsigned short*)&ipHeader, ipHeader.ip_hl * 4);
 
-
-// Заполнение UDP заголовка
 struct udphdr udpHeader;
-udpHeader.uh_sport = htons(68);  // DHCP client port
-udpHeader.uh_dport = htons(67);  // DHCP server port
+udpHeader.uh_sport = htons(68);
+udpHeader.uh_dport = htons(67);
 udpHeader.uh_ulen = htons(sizeof(struct udphdr) + sizeof(DhcpHeader));
 udpHeader.uh_sum = 0;
 
-// Заполнение DHCP заголовка
 DhcpHeader dhcpHeader;
 memset(&dhcpHeader, 0, sizeof(DhcpHeader));
-dhcpHeader.op = 1; // DHCPREQUEST
-dhcpHeader.htype = 1; // Тип аппаратного устройства: Ethernet
-dhcpHeader.hlen = 6; // Длина аппаратного адреса: 6 байт (MAC-адрес)
-dhcpHeader.xid = htonl(123456); // Идентификатор транзакции (любое значение)
-dhcpHeader.secs = htons(0); // Время, прошедшее с начала процесса запроса (в секундах)
-dhcpHeader.flags = htons(0x8000); // Флаги (Broadcast)
-dhcpHeader.ciaddr = htonl(client_ip); // IP адрес клиента
-memcpy(dhcpHeader.chaddr, client_mac, 6); // MAC адрес клиента
+dhcpHeader.op = 1;
+dhcpHeader.htype = 1;
+dhcpHeader.hlen = 6;
+dhcpHeader.xid = htonl(0x3903F326);
+dhcpHeader.secs = htons(0);
+dhcpHeader.flags = htons(0x8000);
+memcpy(dhcpHeader.chaddr, client_mac, 6);
 
-// Заполнение DHCP options
 u_char *options_ptr = dhcpHeader.options;
-options_ptr[0] = 0x63; // DHCP magic cookie
+options_ptr[0] = 0x63;
 options_ptr[1] = 0x82;
 options_ptr[2] = 0x53;
 options_ptr[3] = 0x63;
 options_ptr += 4;
 
 for (const auto& option : options) {
-*options_ptr++ = option.first; // Option code
-*options_ptr++ = option.second.size(); // Option length
+*options_ptr++ = option.first;
+*options_ptr++ = option.second.size();
 for (const auto& val : option.second) {
-*options_ptr++ = val; // Option value
+*options_ptr++ = val;
 }
 }
-
 *options_ptr = 255; // End option
 
-// Создание буфера для хранения Ethernet и DHCP пакета
 char buffer[sizeof(EthernetHeader) + sizeof(struct ip) + sizeof(struct udphdr) + sizeof(DhcpHeader)];
 memcpy(buffer, &ethHeader, sizeof(EthernetHeader));
 memcpy(buffer + sizeof(EthernetHeader), &ipHeader, sizeof(struct ip));
 memcpy(buffer + sizeof(EthernetHeader) + sizeof(struct ip), &udpHeader, sizeof(struct udphdr));
 memcpy(buffer + sizeof(EthernetHeader) + sizeof(struct ip) + sizeof(struct udphdr), &dhcpHeader, sizeof(DhcpHeader));
 
-// Установка параметров сокета
 struct sockaddr_ll addr = {0};
 addr.sll_ifindex = ifr.ifr_ifindex;
 addr.sll_halen = ETH_ALEN;
 memcpy(addr.sll_addr, ethHeader.dest, ETH_ALEN);
 
-// Отправка DHCP пакета
 if (sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
 perror("Error sending packet");
 close(clientSocket);
 return received_packets;
 }
 
-// Прослушивание DHCP ответов
 struct pollfd fds[1];
 fds[0].fd = clientSocket;
 fds[0].events = POLLIN;
@@ -176,7 +158,7 @@ received_packets.push_back(packet);
 }
 }
 } else {
-break; // Exit the loop if no packets are received within the timeout
+break;
 }
 }
 
@@ -184,7 +166,6 @@ close(clientSocket);
 return received_packets;
 }
 
-// Функция для обработки и вывода DHCP пакета
 void process_dhcp_packet(const std::vector<u_char>& packet) {
     if (packet.size() < sizeof(EthernetHeader) + sizeof(struct ip) + sizeof(struct udphdr) + sizeof(DhcpHeader)) {
         std::cout << "Packet too small" << std::endl;
@@ -238,21 +219,17 @@ void process_dhcp_packet(const std::vector<u_char>& packet) {
 }
 
 int main() {
-    const char *interface = "ens33"; // интерфейс для отправки пакета
-    const char *source_mac = "00:0c:29:95:c3:64"; // MAC-адрес источника
-    const char *client_mac = "00:0c:29:95:c3:64"; // MAC-адрес клиента
-    u_int32_t client_ip = inet_addr("192.168.91.133"); // текущий IP-адрес клиента
+    const char *interface = "ens33"; // Interface for sending the packet
+    const char *source_mac = "00:0c:29:95:c3:65"; // Source MAC address (change as needed)
+    const char *client_mac = "00:1a:2b:3c:4d:5e"; // New client MAC address to simulate a new device
 
-    // Опции DHCP
+    // DHCP Options for DHCPDISCOVER
     std::vector<std::pair<u_char, std::vector<u_char>>> options = {
-            {53, {3}}, // DHCP Message Type: DHCPREQUEST
-            {50, {192, 168, 91, 133}}, // Requested IP Address
-            {54, {192, 168, 91, 1}}, // DHCP Server Identifier
-            {58, {0, 0, 0, 0x20}}, // Renewal (T1) time
-            {59, {0, 0, 0, 0x20}} // Rebinding (T2) time
+            {53, {1}}, // DHCP Message Type: DHCPDISCOVER
+            {55, {1, 3, 6, 15, 31, 33, 43, 44, 46, 47, 119, 121}} // Parameter Request List
     };
 
-    std::vector<std::vector<u_char>> received_packets = send_and_receive_dhcp_packet(interface, source_mac, client_mac, client_ip, options);
+    std::vector<std::vector<u_char>> received_packets = send_and_receive_dhcp_packet(interface, source_mac, client_mac, options);
 
     for (const auto& packet : received_packets) {
         process_dhcp_packet(packet);
