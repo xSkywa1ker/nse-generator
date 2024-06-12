@@ -46,13 +46,6 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
         return;
     }
 
-    // Заполнение структуры с информацией об адресе сервера
-    struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(dest_port);
-    serverAddress.sin_addr.s_addr = inet_addr(dest_ip);
-
     UdpHeader udpHeader;
     udpHeader.sourcePort = htons(source_port);
     udpHeader.destinationPort = htons(dest_port);
@@ -69,7 +62,7 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     struct sockaddr_in destAddress;
     memset(&destAddress, 0, sizeof(destAddress));
     destAddress.sin_family = AF_INET;
-    destAddress.sin_port = htons(dest_port);  // This line was missing in the original code
+    destAddress.sin_port = htons(dest_port);
     destAddress.sin_addr.s_addr = inet_addr(dest_ip);
 
     struct sockaddr_in localAddress;
@@ -95,18 +88,32 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     socklen_t addrLen = sizeof(clientAddress);
     char receivedBuffer[1024];
 
-    int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
-    if (bytesReceived < 0) {
-        perror("Error receiving packet");
-        close(clientSocket);
-        return;
+    fd_set readfds;
+    struct timeval timeout;
+    FD_ZERO(&readfds);
+    FD_SET(clientSocket, &readfds);
+    timeout.tv_sec = 5;  // 5 секунд ожидания
+    timeout.tv_usec = 0;
+
+    int selectResult = select(clientSocket + 1, &readfds, NULL, NULL, &timeout);
+    if (selectResult > 0) {
+        int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
+        if (bytesReceived < 0) {
+            perror("Error receiving packet");
+        } else {
+            if (bytesReceived > 0) {
+                ReceivedPacket receivedPacket;
+                memcpy(&receivedPacket.udpHeader, receivedBuffer, sizeof(UdpHeader));
+                receivedPacket.sourcePort = ntohs(clientAddress.sin_port);
+                receivedPackets.push_back(receivedPacket);
+            }
+        }
+    } else if (selectResult == 0) {
+        std::cout << "Receive timeout." << std::endl;
+    } else {
+        perror("Error in select");
     }
-    if (bytesReceived > 0) {
-        ReceivedPacket receivedPacket;
-        memcpy(&receivedPacket.udpHeader, receivedBuffer, sizeof(UdpHeader));
-        receivedPacket.sourcePort = ntohs(clientAddress.sin_port);
-        receivedPackets.push_back(receivedPacket);
-    }
+
     close(clientSocket);
 }
 
@@ -123,7 +130,8 @@ void receive_udp_packet() {
 }
 
 int main() {
-    send_and_receive_udp_packet(65534, 8000, "192.168.91.133", "192.168.91.135", 10, "Hello, UDP!");
+
+    send_and_receive_udp_packet(65534, 7, "192.168.91.133", "192.168.91.136", 10, "Hello, UDP!");
     receive_udp_packet();
     return 0;
 }
