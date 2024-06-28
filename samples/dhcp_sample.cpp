@@ -1,13 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <cstring>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <net/ethernet.h>
-#include <netinet/udp.h>
-
 #define MAX_PACKETS 100
 
 // Структура для DHCP заголовка
@@ -163,32 +153,32 @@ void receive_dhcp_packet(u_int32_t expected_xid, u_short expected_secs, u_short 
     }
 }
 
-int main() {
-    // Здесь передайте необходимые параметры для отправки DHCP пакета
-    const char* interface = "eth0";
-    const char* source_mac = "00:11:22:33:44:55";
-    const char* source_ip = "192.168.1.2";
-    const char* target_mac = "ff:ff:ff:ff:ff:ff"; // Broadcast MAC для DHCP
-    const char* target_ip = "255.255.255.255"; // Broadcast IP для DHCP
-
-    // Заполните остальные поля DHCP пакета
-    u_int32_t transaction_id = 123456;
-    u_short secs = 10;
-    u_short flags = 0;
-    u_int32_t client_ip = 0; // Неизвестный IP адрес клиента
-    u_int32_t your_ip = 0; // Неизвестный IP адрес, который будет присвоен клиенту
-    u_int32_t server_ip = 0; // Неизвестный IP адрес DHCP сервера
-    u_int32_t gateway_ip = 0; // Неизвестный IP адрес шлюза
-    const char* client_mac = "00:11:22:33:44:55"; // MAC адрес клиента
-    const char* server_name = "myserver"; // Имя DHCP сервера
-    const char* filename = "bootfile"; // Имя файла загрузки
-
-    // Отправка DHCP пакета и ожидание ответа
-    send_dhcp_packet(interface, source_mac, source_ip, target_mac, target_ip, transaction_id, secs, flags,
-                     client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
-
-    // Прием и сравнение DHCP пакета
-    receive_dhcp_packet(transaction_id, secs, flags, client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
-
-    return 0;
-}
+//int main() {
+//    // Здесь передайте необходимые параметры для отправки DHCP пакета
+//    const char* interface = "eth0";
+//    const char* source_mac = "00:11:22:33:44:55";
+//    const char* source_ip = "192.168.1.2";
+//    const char* target_mac = "ff:ff:ff:ff:ff:ff"; // Broadcast MAC для DHCP
+//    const char* target_ip = "255.255.255.255"; // Broadcast IP для DHCP
+//
+//    // Заполните остальные поля DHCP пакета
+//    u_int32_t transaction_id = 123456;
+//    u_short secs = 10;
+//    u_short flags = 0;
+//    u_int32_t client_ip = 0; // Неизвестный IP адрес клиента
+//    u_int32_t your_ip = 0; // Неизвестный IP адрес, который будет присвоен клиенту
+//    u_int32_t server_ip = 0; // Неизвестный IP адрес DHCP сервера
+//    u_int32_t gateway_ip = 0; // Неизвестный IP адрес шлюза
+//    const char* client_mac = "00:11:22:33:44:55"; // MAC адрес клиента
+//    const char* server_name = "myserver"; // Имя DHCP сервера
+//    const char* filename = "bootfile"; // Имя файла загрузки
+//
+//    // Отправка DHCP пакета и ожидание ответа
+//    send_dhcp_packet(interface, source_mac, source_ip, target_mac, target_ip, transaction_id, secs, flags,
+//                     client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
+//
+//    // Прием и сравнение DHCP пакета
+//    receive_dhcp_packet(transaction_id, secs, flags, client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
+//
+//    return 0;
+//}

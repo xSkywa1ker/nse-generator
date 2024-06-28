@@ -1,14 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <cstring>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <pcap.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-
 #define PACKET_SIZE 64
 #define ICMP_PACKET_SIZE 56
 #define ICMP_DATA "Hello, ICMP!"
@@ -157,11 +146,11 @@ void receive_icmp_packet(u_char expectedType, u_char expectedCode, u_short expec
     }
 }
 
-int main() {
-    send_and_receive_icmp_packet("192.168.91.135");
-
-    // Здесь необходимо вычислить ожидаемую контрольную сумму ICMP пакета вручную или через функцию
-    u_short expectedChecksum = calculate_checksum((unsigned short *)ICMP_DATA, strlen(ICMP_DATA));
-    receive_icmp_packet(ICMP_ECHO, 0, htons(getpid()), htons(1), expectedChecksum);
-    return 0;
-}
+//int main() {
+//    send_and_receive_icmp_packet("192.168.91.135");
+//
+//    // Здесь необходимо вычислить ожидаемую контрольную сумму ICMP пакета вручную или через функцию
+//    u_short expectedChecksum = calculate_checksum((unsigned short *)ICMP_DATA, strlen(ICMP_DATA));
+//    receive_icmp_packet(ICMP_ECHO, 0, htons(getpid()), htons(1), expectedChecksum);
+//    return 0;
+//}

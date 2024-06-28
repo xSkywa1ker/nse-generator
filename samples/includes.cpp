@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip.h>
-#include <netinet/in.h>
-#include <linux/if_ether.h>
 #include <pcap.h>
+#include <net/ethernet.h>
+#include <netinet/udp.h>
+#include <netinet/if_ether.h>
