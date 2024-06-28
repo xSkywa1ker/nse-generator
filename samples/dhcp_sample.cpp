@@ -93,12 +93,74 @@ void send_dhcp_packet(const char* interface, const char* source_mac, const char*
             ReceivedDhcpPacket receivedDhcpPacket;
             memcpy(&receivedDhcpPacket.dhcpHeader, receivedBuffer, sizeof(DhcpHeader));
             // Дополнительная обработка для получения опций DHCP
-            // receivedDhcpPacket.options.push_back(option); // Пример добавления опции в вектор
+            // Пример добавления опции в вектор
+            int offset = sizeof(DhcpHeader);
+            while (offset < bytesReceived) {
+                DhcpOption option;
+                option.code = receivedBuffer[offset++];
+                if (option.code == 0xff) break; // Конец списка опций
+                option.length = receivedBuffer[offset++];
+                memcpy(option.data, receivedBuffer + offset, option.length);
+                offset += option.length;
+                receivedDhcpPacket.options.push_back(option);
+            }
             receivedDhcpPackets.push_back(receivedDhcpPacket);
         }
     }
 
     close(clientSocket);
+}
+
+// Функция для приема и сравнения DHCP пакетов
+void receive_dhcp_packet(u_int32_t expected_xid, u_short expected_secs, u_short expected_flags, u_int32_t expected_ciaddr,
+                         u_int32_t expected_yiaddr, u_int32_t expected_siaddr, u_int32_t expected_giaddr, const char* expected_chaddr,
+                         const char* expected_sname, const char* expected_file) {
+    if (receivedDhcpPackets.empty()) {
+        printf("No DHCP packets received.\n");
+        return;
+    }
+
+    bool packetFound = false;
+
+    for (auto it = receivedDhcpPackets.begin(); it != receivedDhcpPackets.end(); ++it) {
+        DhcpHeader& header = it->dhcpHeader;
+
+        if (header.xid == expected_xid &&
+            header.secs == expected_secs &&
+            header.flags == expected_flags &&
+            header.ciaddr == expected_ciaddr &&
+            header.yiaddr == expected_yiaddr &&
+            header.siaddr == expected_siaddr &&
+            header.giaddr == expected_giaddr &&
+            memcmp(header.chaddr, expected_chaddr, 6) == 0 &&
+            strncmp(reinterpret_cast<char*>(header.sname), expected_sname, sizeof(header.sname)) == 0 &&
+            strncmp(reinterpret_cast<char*>(header.file), expected_file, sizeof(header.file)) == 0) {
+
+            printf("Matching packet found:\n");
+            printf("DHCP Header:\n");
+            printf(" - Transaction ID: %u\n", ntohl(header.xid));
+            printf(" - Seconds: %u\n", ntohs(header.secs));
+            printf(" - Flags: %u\n", ntohs(header.flags));
+            printf(" - Client IP: %s\n", inet_ntoa(*(struct in_addr*)&header.ciaddr));
+            printf(" - Your IP: %s\n", inet_ntoa(*(struct in_addr*)&header.yiaddr));
+            printf(" - Server IP: %s\n", inet_ntoa(*(struct in_addr*)&header.siaddr));
+            printf(" - Gateway IP: %s\n", inet_ntoa(*(struct in_addr*)&header.giaddr));
+            printf(" - Client MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+                   header.chaddr[0], header.chaddr[1], header.chaddr[2],
+                   header.chaddr[3], header.chaddr[4], header.chaddr[5]);
+            printf(" - Server Name: %s\n", header.sname);
+            printf(" - Boot Filename: %s\n", header.file);
+
+            // Удаление пакета из массива
+            receivedDhcpPackets.erase(it);
+            packetFound = true;
+            break;
+        }
+    }
+
+    if (!packetFound) {
+        printf("No matching packet found.\n");
+    }
 }
 
 int main() {
@@ -125,8 +187,8 @@ int main() {
     send_dhcp_packet(interface, source_mac, source_ip, target_mac, target_ip, transaction_id, secs, flags,
                      client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
 
-    // После выполнения функции DHCP пакеты будут записаны в массив receivedDhcpPackets
-    // Далее вы можете обработать их по вашему усмотрению
+    // Прием и сравнение DHCP пакета
+    receive_dhcp_packet(transaction_id, secs, flags, client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
 
     return 0;
 }
