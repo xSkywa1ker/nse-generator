@@ -1,14 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <cstring>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <pcap.h>
-#include <net/ethernet.h>
-#include <netinet/if_ether.h>
-
 #define MAX_PACKETS 100
 
 // Глобальные переменные для хранения принятых пакетов
@@ -157,9 +146,9 @@ void receive_arp_packet(const char *expected_source_ip, const char *expected_tar
     }
 }
 
-int main() {
-    send_and_receive_arp_packet("eth0", "192.168.1.1", "192.168.1.2");
-
-    receive_arp_packet("192.168.1.1", "192.168.1.2");
-    return 0;
-}
+//int main() {
+//    send_and_receive_arp_packet("eth0", "192.168.1.1", "192.168.1.2");
+//
+//    receive_arp_packet("192.168.1.1", "192.168.1.2");
+//    return 0;
+//}
