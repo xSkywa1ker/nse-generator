@@ -1,11 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <cstring>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-
 #define MAX_PACKETS 100
 
 struct UdpHeader {
@@ -101,15 +93,15 @@ void receive_udp_packet() {
     std::cout << "Checksum: " << ntohs(receivedPacket.udpHeader.checksum) << std::endl;
 }
 
-int main() {
-    const char* data = "Hello, UDP!";
-    const int source_port = 64321;
-    const int dest_port = 64321;
-    const char* source_ip = "192.168.22.136";
-    const char* dest_ip = "192.168.22.137";
-
-    send_and_receive_udp_packet(source_port, dest_port, source_ip, dest_ip, strlen(data), data);
-    receive_udp_packet();
-
-    return 0;
-}
+//int main() {
+//    const char* data = "Hello, UDP!";
+//    const int source_port = 64321;
+//    const int dest_port = 64321;
+//    const char* source_ip = "192.168.22.136";
+//    const char* dest_ip = "192.168.22.137";
+//
+//    send_and_receive_udp_packet(source_port, dest_port, source_ip, dest_ip, strlen(data), data);
+//    receive_udp_packet();
+//
+//    return 0;
+//}
