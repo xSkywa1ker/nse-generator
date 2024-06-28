@@ -38,7 +38,6 @@ unsigned short calculate_checksum(const char* data, size_t length) {
     return ~sum;
 }
 
-
 void send_and_receive_udp_packet(int source_port, int dest_port, const char* source_ip, const char* dest_ip, size_t dataLength, const char* data) {
     // Создание сокета
     int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -46,20 +45,13 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
         perror("Error creating socket");
         return;
     }
-    std::cout  << "FLAG" << std::endl;
-    // Заполнение структуры с информацией об адресе сервера
-    struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(dest_port);
-    serverAddress.sin_addr.s_addr = inet_addr(dest_ip);
 
     UdpHeader udpHeader;
     udpHeader.sourcePort = htons(source_port);
     udpHeader.destinationPort = htons(dest_port);
     udpHeader.length = htons(sizeof(UdpHeader) + dataLength);
     udpHeader.checksum = 0;
-    std::cout  << "FLAG" << std::endl;
+
     char buffer[sizeof(UdpHeader) + dataLength];
     memcpy(buffer, &udpHeader, sizeof(UdpHeader));
     memcpy(buffer + sizeof(UdpHeader), data, dataLength);
@@ -70,46 +62,94 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     struct sockaddr_in destAddress;
     memset(&destAddress, 0, sizeof(destAddress));
     destAddress.sin_family = AF_INET;
+    destAddress.sin_port = htons(dest_port);
     destAddress.sin_addr.s_addr = inet_addr(dest_ip);
-    std::cout  << "FLAG" << std::endl;
-    sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&destAddress, sizeof(destAddress));
-    std::cout  << "FLAG1" << std::endl;
+
+    struct sockaddr_in localAddress;
+    memset(&localAddress, 0, sizeof(localAddress));
+    localAddress.sin_family = AF_INET;
+    localAddress.sin_port = htons(source_port);
+    localAddress.sin_addr.s_addr = inet_addr(source_ip);
+
+    if (bind(clientSocket, (struct sockaddr*)&localAddress, sizeof(localAddress)) < 0) {
+        perror("Error binding socket");
+        close(clientSocket);
+        return;
+    }
+
+    int bytesSent = sendto(clientSocket, buffer, sizeof(UdpHeader) + dataLength, 0, (struct sockaddr*)&destAddress, sizeof(destAddress));
+    if (bytesSent < 0) {
+        perror("Error sending packet");
+        close(clientSocket);
+        return;
+    }
 
     struct sockaddr_in clientAddress;
     socklen_t addrLen = sizeof(clientAddress);
     char receivedBuffer[1024];
 
-    int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
-    if (bytesReceived > 0) {
-        ReceivedPacket receivedPacket;
-        memcpy(&receivedPacket.udpHeader, receivedBuffer, sizeof(UdpHeader));
-        receivedPacket.sourcePort = ntohs(clientAddress.sin_port);
-        receivedPackets.push_back(receivedPacket);
+    fd_set readfds;
+    struct timeval timeout;
+    FD_ZERO(&readfds);
+    FD_SET(clientSocket, &readfds);
+    timeout.tv_sec = 5;  // 5 секунд ожидания
+    timeout.tv_usec = 0;
+
+    int selectResult = select(clientSocket + 1, &readfds, NULL, NULL, &timeout);
+    if (selectResult > 0) {
+        int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, (struct sockaddr*)&clientAddress, &addrLen);
+        if (bytesReceived < 0) {
+            perror("Error receiving packet");
+        } else {
+            if (bytesReceived > 0) {
+                ReceivedPacket receivedPacket;
+                memcpy(&receivedPacket.udpHeader, receivedBuffer, sizeof(UdpHeader));
+                receivedPacket.sourcePort = ntohs(clientAddress.sin_port);
+                receivedPackets.push_back(receivedPacket);
+            }
+        }
+    } else if (selectResult == 0) {
+        std::cout << "Receive timeout." << std::endl;
+    } else {
+        perror("Error in select");
     }
+
     close(clientSocket);
 }
 
-void receive_udp_packet() {
+void receive_udp_packet(u_short expectedSourcePort, u_short expectedDestPort, u_short expectedLength, u_short expectedChecksum) {
     if (receivedPackets.empty()) {
         std::cout << "No UDP packets received." << std::endl;
         return;
     }
-    ReceivedPacket& receivedPacket = receivedPackets[0];
-    std::cout << "Source Port: " << ntohs(receivedPacket.sourcePort) << std::endl;
-    std::cout << "Destination Port: " << ntohs(receivedPacket.udpHeader.destinationPort) << std::endl;
-    std::cout << "Length: " << ntohs(receivedPacket.udpHeader.length) << std::endl;
-    std::cout << "Checksum: " << ntohs(receivedPacket.udpHeader.checksum) << std::endl;
+
+    bool packetFound = false;
+
+    for (auto it = receivedPackets.begin(); it != receivedPackets.end(); ++it) {
+        if (it->udpHeader.sourcePort == expectedSourcePort &&
+            it->udpHeader.destinationPort == expectedDestPort &&
+            it->udpHeader.length == expectedLength &&
+            it->udpHeader.checksum == expectedChecksum) {
+
+            std::cout << "Matching packet found:" << std::endl;
+            std::cout << "Source Port: " << ntohs(it->sourcePort) << std::endl;
+            std::cout << "Destination Port: " << ntohs(it->udpHeader.destinationPort) << std::endl;
+            std::cout << "Length: " << ntohs(it->udpHeader.length) << std::endl;
+            std::cout << "Checksum: " << ntohs(it->udpHeader.checksum) << std::endl;
+
+            receivedPackets.erase(it);
+            packetFound = true;
+            break;
+        }
+    }
+
+    if (!packetFound) {
+        std::cout << "No matching packet found." << std::endl;
+    }
 }
 
 int main() {
-    const char* data = "Hello, UDP!";
-    const int source_port = 64321;
-    const int dest_port = 64321;
-    const char* source_ip = "192.168.22.136";
-    const char* dest_ip = "192.168.22.137";
-
-    send_and_receive_udp_packet(source_port, dest_port, source_ip, dest_ip, strlen(data), data);
-    receive_udp_packet();
-
+    send_and_receive_udp_packet(65534, 7, "192.168.91.133", "192.168.91.135", 10, "Hello, UDP!");
+    receive_udp_packet(htons(65534), htons(7), htons(sizeof(UdpHeader) + 10), htons(calculate_checksum("Hello, UDP!", 10)));
     return 0;
 }
