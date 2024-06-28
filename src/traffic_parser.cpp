@@ -39,11 +39,11 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
             if (etherType == 0x0800) {
                 ip_header *ipHeader = (ip_header *)(packetData + 14);
                 bool is_scanner = true;
-                if (ip_to_char(ipHeader->saddr) == ip_scanner) {
+                if (ip_to_char(ipHeader->saddr) == ip_scanner || ip_scanner == "0") {
                     std::cout << "scanner" << std::endl;
                     is_scanner = true;
                 }
-                else {
+                else if (ip_to_char(ipHeader->saddr) == ip_victim || ip_victim == "0"){
                     std::cout << "victim" << std::endl;
                     is_scanner = false;
                 }
@@ -60,10 +60,10 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
                         analizer(packetData, is_scanner, 17);
                     }
                 }
-                else if (ipHeader->proto == 2) {
+                else if (ipHeader->proto == 1) {
                     icmp_header *icmpHeader = (icmp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     std::cout << "ICMP" << std::endl;
-                    analizer(packetData, is_scanner, 2);
+                    analizer(packetData, is_scanner, 1);
                 }
             }
         }
