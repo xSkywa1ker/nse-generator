@@ -77,7 +77,6 @@ typedef struct udp_header {
     u_short dport;
     u_short len;
     u_short checksum;
-    u_char data[1];
 } udp_header;
 
 typedef struct icmp_header {
@@ -124,54 +123,57 @@ std::string var = "int main() {\n}";
 void callTcp(bool isScanner, const u_char *receivedPacket, char *appData) {
     tcp_header* th = (tcp_header *)receivedPacket;
     if (isScanner) {
-        std::sprintf(appData, "\tsend_tcp_packet(%02x, %02x, %2x, %d,%02x, 0x%02x );\n",
-                     HEX_TO_DEC(std::to_string(th->th_win)),
-                     HEX_TO_DEC(std::to_string(ntohs(th->sport))),
-                     HEX_TO_DEC(std::to_string(ntohs(th->dport))), HEX_TO_DEC(std::to_string(ntohs(th->th_seq))),
-                     HEX_TO_DEC(std::to_string(ntohs(th->th_ack))), th->th_flags);
+        std::sprintf(appData, "\tsend_tcp_packet(%d, %d, %d, %d, %d, 0x%02x);\n",
+                     ntohs(th->sport),
+                     ntohs(th->dport),
+                     ntohl(th->th_seq),
+                     ntohl(th->th_ack),
+                     th->th_win, th->th_flags);
     } else {
-        std::sprintf(appData, "\tlisten_tcp_packet(%02x, 0x%02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(th->dport))), th->th_flags);
+        std::sprintf(appData, "\tlisten_tcp_packet(%d, 0x%02x);\n",
+                     ntohs(th->dport), th->th_flags);
     }
 }
 
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData) {
     udp_header* uh = (udp_header *)receivedPacket;
     if (isScanner) {
-        std::sprintf(appData, "\tsend_udp_packet(%02x, %02x, %02x, %s);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(uh->sport))),
-                     HEX_TO_DEC(std::to_string(ntohs(uh->dport))),
-                     ntohs(uh->len), uh->data);
+        std::sprintf(appData, "\tsend_udp_packet(%d, %d, %d);\n",
+                     ntohs(uh->sport),
+                     ntohs(uh->dport),
+                     ntohs(uh->len));
     } else {
-        std::sprintf(appData, "\tlisten_udp_packet(%02x);\n",
-                     HEX_TO_DEC(std::to_string(ntohs(uh->dport))));
+        std::sprintf(appData, "\tlisten_udp_packet(%d);\n",
+                     ntohs(uh->dport));
     }
 }
 
 void callICMP(bool isScanner, const u_char *receivedPacket, char *appData) {
     icmp_header* ih = (icmp_header *)receivedPacket;
     if (isScanner) {
-        std::sprintf(appData, "\tsend_icmp_packet(%02x, %02x, %02x, %02x);\n",
-                     HEX_TO_DEC(std::to_string(ih->type)),
-                     HEX_TO_DEC(std::to_string(ih->code)),
-                     ih->identifier,
-                     HEX_TO_DEC(std::to_string(ntohs(ih->sequenceNumber))));
+        std::sprintf(appData, "\tsend_icmp_packet(%d, %d, %d, %d);\n",
+                     ih->type,
+                     ih->code,
+                     ntohs(ih->identifier),
+                     ntohs(ih->sequenceNumber));
     } else {
-        std::sprintf(appData, "\tlisten_icmp_packet(%02x);\n",
-                     HEX_TO_DEC(std::to_string(ih->type)));
+        std::sprintf(appData, "\tlisten_icmp_packet(%d);\n",
+                     ih->type);
     }
 }
 
 void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData) {
     dhcp_header* dhcph = (dhcp_header*)receivedPacket;
     if (isScanner) {
-        std::sprintf(appData, "\tsend_dhcp_packet(%02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x);\n",
-                     dhcph->op, dhcph->htype, dhcph->hlen, dhcph->hops, dhcph->xid, dhcph->secs, dhcph->flags, dhcph->ciaddr,
-                     dhcph->yiaddr, dhcph->siaddr, dhcph->giaddr, dhcph->chaddr, dhcph->sname, dhcph->file);
+        std::sprintf(appData, "\tsend_dhcp_packet(\"eth0\", \"%02x:%02x:%02x:%02x:%02x:%02x\", \"0.0.0.0\", \"ff:ff:ff:ff:ff:ff\", \"255.255.255.255\", %u, %u, %u, %u, %u, %u, %u, \"%02x:%02x:%02x:%02x:%02x:%02x\", \"%s\", \"%s\");\n",
+                     dhcph->chaddr[0], dhcph->chaddr[1], dhcph->chaddr[2], dhcph->chaddr[3], dhcph->chaddr[4], dhcph->chaddr[5],
+                     ntohl(dhcph->xid), ntohs(dhcph->secs), ntohs(dhcph->flags), ntohl(dhcph->ciaddr),
+                     ntohl(dhcph->yiaddr), ntohl(dhcph->siaddr), ntohl(dhcph->giaddr),
+                     dhcph->chaddr[0], dhcph->chaddr[1], dhcph->chaddr[2], dhcph->chaddr[3], dhcph->chaddr[4], dhcph->chaddr[5],
+                     dhcph->sname, dhcph->file);
     } else {
-        std::sprintf(appData, "\tlisten_dhcp_packet(%02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x);\n",
-                     dhcph->op, dhcph->htype, dhcph->hlen, dhcph->hops, dhcph->xid, dhcph->secs, dhcph->flags, dhcph->ciaddr,
-                     dhcph->yiaddr, dhcph->siaddr, dhcph->giaddr, dhcph->chaddr, dhcph->sname, dhcph->file);
+        std::sprintf(appData, "\tlisten_dhcp_packet(%u);\n",
+                     ntohl(dhcph->xid));
     }
 }
 
@@ -211,9 +213,9 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto) {
         callUdp(true, receivedPacket, appData);
     } else if (proto == 67) {
         callDHCP(true, receivedPacket, appData);
-    } else if (proto == 2) {
+    } else if (proto == 1) { // ICMP
         callICMP(true, receivedPacket, appData);
-    } else if (proto == 1) {
+    } else if (proto == 2) { // ARP
         callARP(true, receivedPacket, appData);
     }
 
@@ -235,9 +237,9 @@ void fillFieldsVictim(const u_char *receivedPacket, int proto) {
         callUdp(false, receivedPacket, appData);
     } else if (proto == 67) {
         callDHCP(false, receivedPacket, appData);
-    } else if (proto == 2) {
+    } else if (proto == 1) { // ICMP
         callICMP(false, receivedPacket, appData);
-    } else if (proto == 1) {
+    } else if (proto == 2) { // ARP
         callARP(false, receivedPacket, appData);
     }
 
@@ -357,7 +359,7 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
         } else {
             fillFieldsVictim(receivedPacket, 17);
         }
-    } else if (proto == 2) {
+    } else if (proto == 1) { // ICMP
         icmp_header *icmpHeader = (icmp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
         std::ifstream inputTemplate("samples/icmp_sample.cpp");
         std::ofstream outputResult("results/result.cpp");
@@ -373,11 +375,11 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 2);
+            fillFieldsScanner(receivedPacket, 1);
         } else {
-            fillFieldsVictim(receivedPacket, 2);
+            fillFieldsVictim(receivedPacket, 1);
         }
-    } else if (proto == 1) {
+    } else if (proto == 2) { // ARP
         arp_header *arpHeader = (arp_header *)(receivedPacket + SIZE_ETHERNET);
         std::ifstream inputTemplate("samples/arp_sample.cpp");
         std::ofstream outputResult("results/result.cpp");
@@ -393,9 +395,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
         inputTemplate.close();
         outputResult.close();
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 1);
+            fillFieldsScanner(receivedPacket, 2);
         } else {
-            fillFieldsVictim(receivedPacket, 1);
+            fillFieldsVictim(receivedPacket, 2);
         }
     } else if (proto == 67) {
         dhcp_header *dhcpHeader = (dhcp_header *)(receivedPacket + 14 + ((ip_hdr->ver_ihl & 0x0F) * 4));
