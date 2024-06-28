@@ -5,163 +5,161 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/if_arp.h>  // Include this for ARP constants
+#include <pcap.h>
+#include <net/ethernet.h>
+#include <netinet/if_ether.h>
 
 #define MAX_PACKETS 100
 
-struct ArpHeader {
-    u_short hardwareType;
-    u_short protocolType;
-    u_char hardwareSize;
-    u_char protocolSize;
-    u_short opcode;
-    u_char senderMAC[6];
-    u_char senderIP[4];
-    u_char targetMAC[6];
-    u_char targetIP[4];
-};
+// Глобальные переменные для хранения принятых пакетов
+struct pcap_pkthdr *received_packet_headers[MAX_PACKETS];
+const u_char *received_packets[MAX_PACKETS];
+int num_received_packets = 0;
 
-struct EthernetHeader {
-    u_char destinationMAC[6];
-    u_char sourceMAC[6];
-    u_short etherType;
-};
+void send_and_receive_arp_packet(const char *interface, const char *source_ip, const char *target_ip) {
+    int sockfd;
+    struct sockaddr_ll socket_address;
+    char packet[42];
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *handle;
 
-struct ReceivedArpPacket {
-    EthernetHeader ethHeader;
-    ArpHeader arpHeader;
-};
-
-std::vector<ReceivedArpPacket> receivedArpPackets;
-
-void process_received_arp_packets() {
-    if (receivedArpPackets.empty()) {
-        std::cout << "No ARP packets received." << std::endl;
-        return;
+    // Создание сокета
+    if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP))) == -1) {
+        perror("socket");
+        exit(EXIT_FAILURE);
     }
 
-    // Process ARP packets in the array
-    for (const auto& receivedArpPacket : receivedArpPackets) {
-        std::cout << "ARP Response Received:" << std::endl;
-        std::cout << "Sender MAC: ";
-        for (int i = 0; i < 6; ++i) {
-            printf("%02X ", receivedArpPacket.arpHeader.senderMAC[i]);
-        }
-        std::cout << std::endl;
-
-        std::cout << "Sender IP: ";
-        for (int i = 0; i < 4; ++i) {
-            std::cout << (int)receivedArpPacket.arpHeader.senderIP[i];
-            if (i < 3) std::cout << ".";
-        }
-        std::cout << std::endl;
+    // Открытие интерфейса для прослушивания ARP пакетов
+    if ((handle = pcap_open_live(interface, BUFSIZ, 1, 1000, errbuf)) == NULL) {
+        fprintf(stderr, "pcap_open_live: %s\n", errbuf);
+        exit(EXIT_FAILURE);
     }
+
+    // Установка фильтра для принятых ARP пакетов
+    struct bpf_program fp;
+    char filter_exp[] = "arp";
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "pcap_compile: %s\n", pcap_geterr(handle));
+        exit(EXIT_FAILURE);
+    }
+    if (pcap_setfilter(handle, &fp) == -1) {
+        fprintf(stderr, "pcap_setfilter: %s\n", pcap_geterr(handle));
+        exit(EXIT_FAILURE);
+    }
+
+    // Создание ARP пакета
+    struct ether_header *eth_header = (struct ether_header *)packet;
+    struct ether_arp *arp_packet = (struct ether_arp *)(packet + sizeof(struct ether_header));
+
+    memset(packet, 0, sizeof(packet));
+
+    // Заполнение Ethernet заголовка
+    memset(eth_header->ether_dhost, 0xff, ETH_ALEN); // MAC-адрес назначения (broadcast)
+    memset(eth_header->ether_shost, 0x00, ETH_ALEN); // MAC-адрес источника
+    eth_header->ether_type = htons(ETHERTYPE_ARP);
+
+    // Заполнение ARP пакета
+    arp_packet->ea_hdr.ar_hrd = htons(ARPHRD_ETHER);
+    arp_packet->ea_hdr.ar_pro = htons(ETHERTYPE_IP);
+    arp_packet->ea_hdr.ar_hln = ETH_ALEN;
+    arp_packet->ea_hdr.ar_pln = sizeof(in_addr_t);
+    arp_packet->ea_hdr.ar_op = htons(ARPOP_REQUEST);
+
+    // MAC-адрес источника
+    memset(arp_packet->arp_sha, 0x00, ETH_ALEN);
+    // IP-адрес источника
+    inet_pton(AF_INET, source_ip, arp_packet->arp_spa);
+    // MAC-адрес назначения (broadcast)
+    memset(arp_packet->arp_tha, 0x00, ETH_ALEN);
+    // IP-адрес назначения
+    inet_pton(AF_INET, target_ip, arp_packet->arp_tpa);
+
+    // Отправка ARP пакета
+    socket_address.sll_family = AF_PACKET;
+    socket_address.sll_protocol = htons(ETH_P_ARP);
+    socket_address.sll_halen = ETH_ALEN;
+    memset(socket_address.sll_addr, 0xff, ETH_ALEN);
+
+    if (sendto(sockfd, packet, sizeof(packet), 0, (struct sockaddr *)&socket_address, sizeof(socket_address)) == -1) {
+        perror("sendto");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("ARP packet sent successfully!\n");
+
+    // Получение ARP пакетов
+    struct pcap_pkthdr *header;
+    const u_char *pkt_data;
+    while (1) {
+        if (pcap_next_ex(handle, &header, &pkt_data) == 1) {
+            // Запись принятого пакета в массив
+            received_packet_headers[num_received_packets] = header;
+            received_packets[num_received_packets] = pkt_data;
+            num_received_packets++;
+            break; // Выход из цикла после получения одного пакета
+        }
+    }
+
+    // Закрытие сокета
+    close(sockfd);
+
+    // Закрытие сессии pcap
+    pcap_close(handle);
 }
 
-void send_and_receive_arp_packet(
-        const char* source_mac, const char* source_ip,
-        const char* target_mac, const char* target_ip,
-        const char* interface, u_short opcode,
-        u_short hardwareType, u_short protocolType,
-        u_char hardwareSize, u_char protocolSize
-) {
-    // Create a raw socket
-    int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (clientSocket < 0) {
-        perror("Error creating socket");
+void receive_arp_packet(const char *expected_source_ip, const char *expected_target_ip) {
+    if (num_received_packets == 0) {
+        printf("No ARP packets received.\n");
         return;
     }
 
-    // Get the interface index
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, interface, IFNAMSIZ-1);
-    if (ioctl(clientSocket, SIOCGIFINDEX, &ifr) < 0) {
-        perror("Error getting interface index");
-        close(clientSocket);
-        return;
-    }
-    int ifindex = ifr.ifr_ifindex;
+    bool packetFound = false;
 
-    // Construct Ethernet header
-    EthernetHeader ethHeader;
-    sscanf(source_mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-           &ethHeader.sourceMAC[0], &ethHeader.sourceMAC[1], &ethHeader.sourceMAC[2],
-           &ethHeader.sourceMAC[3], &ethHeader.sourceMAC[4], &ethHeader.sourceMAC[5]);
-    sscanf(target_mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-           &ethHeader.destinationMAC[0], &ethHeader.destinationMAC[1], &ethHeader.destinationMAC[2],
-           &ethHeader.destinationMAC[3], &ethHeader.destinationMAC[4], &ethHeader.destinationMAC[5]);
-    ethHeader.etherType = htons(ETH_P_ARP);
+    for (int i = 0; i < num_received_packets; i++) {
+        struct ether_header *eth_header = (struct ether_header *)received_packets[i];
+        struct ether_arp *arp_packet = (struct ether_arp *)(received_packets[i] + sizeof(struct ether_header));
 
-    // Construct ARP header
-    ArpHeader arpHeader;
-    arpHeader.hardwareType = htons(hardwareType);
-    arpHeader.protocolType = htons(protocolType);
-    arpHeader.hardwareSize = hardwareSize;
-    arpHeader.protocolSize = protocolSize;
-    arpHeader.opcode = htons(opcode);
-    memcpy(arpHeader.senderMAC, ethHeader.sourceMAC, 6);
-    inet_pton(AF_INET, source_ip, arpHeader.senderIP);
-    memcpy(arpHeader.targetMAC, ethHeader.destinationMAC, 6);
-    inet_pton(AF_INET, target_ip, arpHeader.targetIP);
+        char source_ip[INET_ADDRSTRLEN];
+        char target_ip[INET_ADDRSTRLEN];
 
-    // Combine Ethernet and ARP headers
-    char packet[sizeof(EthernetHeader) + sizeof(ArpHeader)];
-    memcpy(packet, &ethHeader, sizeof(EthernetHeader));
-    memcpy(packet + sizeof(EthernetHeader), &arpHeader, sizeof(ArpHeader));
+        inet_ntop(AF_INET, arp_packet->arp_spa, source_ip, INET_ADDRSTRLEN);
+        inet_ntop(AF_INET, arp_packet->arp_tpa, target_ip, INET_ADDRSTRLEN);
 
-    // Set up the sockaddr_ll structure
-    struct sockaddr_ll addr = {};
-    addr.sll_ifindex = ifindex;
-    addr.sll_halen = ETH_ALEN;
-    memcpy(addr.sll_addr, ethHeader.destinationMAC, ETH_ALEN);
+        if (strcmp(source_ip, expected_source_ip) == 0 && strcmp(target_ip, expected_target_ip) == 0) {
+            printf("Matching packet found:\n");
+            printf("Ethernet Header:\n");
+            printf(" - Source MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+                   eth_header->ether_shost[0], eth_header->ether_shost[1],
+                   eth_header->ether_shost[2], eth_header->ether_shost[3],
+                   eth_header->ether_shost[4], eth_header->ether_shost[5]);
+            printf(" - Destination MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+                   eth_header->ether_dhost[0], eth_header->ether_dhost[1],
+                   eth_header->ether_dhost[2], eth_header->ether_dhost[3],
+                   eth_header->ether_dhost[4], eth_header->ether_dhost[5]);
+            printf("ARP Header:\n");
+            printf(" - Source IP: %s\n", source_ip);
+            printf(" - Target IP: %s\n", target_ip);
+            printf(" - Operation: %d\n", ntohs(arp_packet->ea_hdr.ar_op));
 
-    // Send the packet
-    if (sendto(clientSocket, packet, sizeof(packet), 0, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("Error sending packet");
-        close(clientSocket);
-        return;
-    }
-
-    // Receive packets
-    char receivedBuffer[1024];
-    while (receivedArpPackets.size() < MAX_PACKETS) {
-        int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, NULL, NULL);
-        if (bytesReceived > 0) {
-            EthernetHeader* receivedEthHeader = (EthernetHeader*)receivedBuffer;
-            if (ntohs(receivedEthHeader->etherType) == ETH_P_ARP) {
-                ArpHeader* receivedArpHeader = (ArpHeader*)(receivedBuffer + sizeof(EthernetHeader));
-                if (ntohs(receivedArpHeader->opcode) == ARPOP_REPLY) {
-                    ReceivedArpPacket receivedArpPacket;
-                    memcpy(&receivedArpPacket.ethHeader, receivedEthHeader, sizeof(EthernetHeader));
-                    memcpy(&receivedArpPacket.arpHeader, receivedArpHeader, sizeof(ArpHeader));
-                    receivedArpPackets.push_back(receivedArpPacket);
-                }
+            // Удаление пакета из массива
+            for (int j = i; j < num_received_packets - 1; j++) {
+                received_packet_headers[j] = received_packet_headers[j + 1];
+                received_packets[j] = received_packets[j + 1];
             }
+            num_received_packets--;
+            packetFound = true;
+            break;
         }
     }
 
-    close(clientSocket);
+    if (!packetFound) {
+        printf("No matching packet found.\n");
+    }
 }
 
 int main() {
-    const char* source_mac = "00:0c:29:95:c3:64";
-    const char* source_ip = "192.168.91.133";
-    const char* target_mac = "FF:FF:FF:FF:FF:FF";
-    const char* target_ip = "192.168.91.135";
-    const char* interface = "ens33";
-    u_short opcode = ARPOP_REQUEST;
-    u_short hardwareType = ARPHRD_ETHER;
-    u_short protocolType = ETH_P_IP;
-    u_char hardwareSize = 6;
-    u_char protocolSize = 4;
+    send_and_receive_arp_packet("eth0", "192.168.1.1", "192.168.1.2");
 
-    send_and_receive_arp_packet(source_mac, source_ip, target_mac, target_ip, interface, opcode, hardwareType, protocolType, hardwareSize, protocolSize);
-    process_received_arp_packets();
-
+    receive_arp_packet("192.168.1.1", "192.168.1.2");
     return 0;
 }
