@@ -1,3 +1,14 @@
+#include <iostream>
+#include <vector>
+#include <cstring>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <pcap.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+
 #define PACKET_SIZE 64
 #define ICMP_PACKET_SIZE 56
 #define ICMP_DATA "Hello, ICMP!"
@@ -97,27 +108,60 @@ void send_and_receive_icmp_packet(const char *dest_ip) {
     pcap_close(handle);
 }
 
-void receive_icmp_packet() {
+void receive_icmp_packet(u_char expectedType, u_char expectedCode, u_short expectedId, u_short expectedSeq, u_short expectedChecksum) {
     if (num_received_packets == 0) {
         printf("No ICMP packets received.\n");
         return;
     }
 
-    // Вывод полей первого пакета из массива
-    struct ip *ip_header = (struct ip *)received_packets[0];
-    struct icmp *icmp_packet = (struct icmp *)(received_packets[0] + (ip_header->ip_hl << 2));
+    bool packetFound = false;
 
-    printf("IP Header:\n");
-    printf(" - Source IP: %s\n", inet_ntoa(ip_header->ip_src));
-    printf(" - Destination IP: %s\n", inet_ntoa(ip_header->ip_dst));
+    for (int i = 0; i < num_received_packets; i++) {
+        struct ip *ip_header = (struct ip *)received_packets[i];
+        struct icmp *icmp_packet = (struct icmp *)(received_packets[i] + (ip_header->ip_hl << 2));
 
-    printf("ICMP Header:\n");
-    printf(" - Type: %d\n", icmp_packet->icmp_type);
-    printf(" - Code: %d\n", icmp_packet->icmp_code);
-    printf(" - ID: %d\n", ntohs(icmp_packet->icmp_id));
-    printf(" - Sequence: %d\n", ntohs(icmp_packet->icmp_seq));
-    printf(" - Checksum: 0x%x\n", ntohs(icmp_packet->icmp_cksum));
+        if (icmp_packet->icmp_type == expectedType &&
+            icmp_packet->icmp_code == expectedCode &&
+            ntohs(icmp_packet->icmp_id) == expectedId &&
+            ntohs(icmp_packet->icmp_seq) == expectedSeq &&
+            ntohs(icmp_packet->icmp_cksum) == expectedChecksum) {
 
-    printf("ICMP Data:\n");
-    printf(" - %s\n", received_packets[0] + (ip_header->ip_hl << 2) + sizeof(struct icmp));
+            printf("Matching packet found:\n");
+            printf("IP Header:\n");
+            printf(" - Source IP: %s\n", inet_ntoa(ip_header->ip_src));
+            printf(" - Destination IP: %s\n", inet_ntoa(ip_header->ip_dst));
+
+            printf("ICMP Header:\n");
+            printf(" - Type: %d\n", icmp_packet->icmp_type);
+            printf(" - Code: %d\n", icmp_packet->icmp_code);
+            printf(" - ID: %d\n", ntohs(icmp_packet->icmp_id));
+            printf(" - Sequence: %d\n", ntohs(icmp_packet->icmp_seq));
+            printf(" - Checksum: 0x%x\n", ntohs(icmp_packet->icmp_cksum));
+
+            printf("ICMP Data:\n");
+            printf(" - %s\n", (char *)(received_packets[i] + (ip_header->ip_hl << 2) + sizeof(struct icmp)));
+
+            // Удаление пакета из массива
+            for (int j = i; j < num_received_packets - 1; j++) {
+                received_packet_headers[j] = received_packet_headers[j + 1];
+                received_packets[j] = received_packets[j + 1];
+            }
+            num_received_packets--;
+            packetFound = true;
+            break;
+        }
+    }
+
+    if (!packetFound) {
+        printf("No matching packet found.\n");
+    }
+}
+
+int main() {
+    send_and_receive_icmp_packet("192.168.91.135");
+
+    // Здесь необходимо вычислить ожидаемую контрольную сумму ICMP пакета вручную или через функцию
+    u_short expectedChecksum = calculate_checksum((unsigned short *)ICMP_DATA, strlen(ICMP_DATA));
+    receive_icmp_packet(ICMP_ECHO, 0, htons(getpid()), htons(1), expectedChecksum);
+    return 0;
 }
