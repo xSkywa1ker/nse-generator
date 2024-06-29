@@ -17,6 +17,9 @@
 #define SIZE_UDP 8
 #define MAX_OPTION_SIZE 40
 
+const char* source_ip = "192.168.91.133";
+const char* dest_ip = "192.168.91.135";
+
 typedef struct arp_header {
     u_short hardware_type;     // Тип аппаратного устройства
     u_short protocol_type;     // Тип протокола
@@ -138,12 +141,15 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData) {
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData) {
     udp_header* uh = (udp_header *)receivedPacket;
     if (isScanner) {
-        std::sprintf(appData, "\tsend_udp_packet(%d, %d, %d);\n",
+        std::sprintf(appData, "\tsend_and_receive_udp_packet(%d, %d, %s, %s, %d, %s);\n",
                      ntohs(uh->sport),
                      ntohs(uh->dport),
-                     ntohs(uh->len));
+                     source_ip,
+                     dest_ip,
+                     ntohs(uh->len),
+                     "hello");
     } else {
-        std::sprintf(appData, "\tlisten_udp_packet(%d);\n",
+        std::sprintf(appData, "\treceive_udp_packet(%d);\n",
                      ntohs(uh->dport));
     }
 }

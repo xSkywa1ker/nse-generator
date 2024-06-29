@@ -76,10 +76,10 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner,std::stri
 
     std::ofstream scriptFile("script.nse");
     if (scriptFile.is_open()) {
-        scriptFile << "description = \"Custom NSE Script for TCP results\"\n";
+        scriptFile << "description = \"Custom NSE Script for results\"\n";
         scriptFile << "categories = {\"default\"}\n";
         scriptFile << "action = function ()\n";
-        scriptFile << "   os.execute(\"g++ -o temp src/result.cpp -lpcap\")\n";
+        scriptFile << "   os.execute(\"g++ -o temp results/result.cpp -lpcap\")\n";
         scriptFile << "   os.execute(\"sleep 2\")\n";
         scriptFile << "   os.execute(\"./temp\")\n";
         scriptFile << "end\n";
