@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <iomanip>
 #include <cmath>
+#include <vector>
 
 #define MAX_PACKET_LIFETIME 120 // Максимальное время жизни пакета в секундах
 #define MAX_PACKET_SIZE 65535   // Максимальная длина пакета
@@ -16,9 +17,6 @@
 #define SIZE_ICMP 8
 #define SIZE_UDP 8
 #define MAX_OPTION_SIZE 40
-
-const char* source_ip = "192.168.91.133";
-const char* dest_ip = "192.168.91.135";
 
 typedef struct arp_header {
     u_short hardware_type;     // Тип аппаратного устройства
@@ -118,6 +116,20 @@ struct TemplateFlag {
 
 TemplateFlag templateFlag;
 
+struct UdpHeader {
+    u_short sourcePort;
+    u_short destinationPort;
+    u_short length;
+    u_short checksum;
+};
+
+struct ReceivedPacket {
+    UdpHeader udpHeader;
+    int sourcePort;
+};
+
+std::vector<ReceivedPacket> receivedPackets;
+
 uint16_t pcap_in_cksum(unsigned short *addr, int len);
 int HEX_TO_DEC(const std::string &st);
 
@@ -138,10 +150,10 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData) {
     }
 }
 
-void callUdp(bool isScanner, const u_char *receivedPacket, char *appData) {
+void callUdp(bool isScanner, const u_char *receivedPacket, char *appData, const char* source_ip, const char* dest_ip) {
     udp_header* uh = (udp_header *)receivedPacket;
     if (isScanner) {
-        std::sprintf(appData, "\tsend_and_receive_udp_packet(%d, %d, %s, %s, %d, %s);\n",
+        std::sprintf(appData, "\tsend_and_receive_udp_packet(%d, %d, \"%s\", \"%s\", %d, \"%s\");\n",
                      ntohs(uh->sport),
                      ntohs(uh->dport),
                      source_ip,
@@ -149,8 +161,11 @@ void callUdp(bool isScanner, const u_char *receivedPacket, char *appData) {
                      ntohs(uh->len),
                      "hello");
     } else {
-        std::sprintf(appData, "\treceive_udp_packet(%d);\n",
-                     ntohs(uh->dport));
+        std::sprintf(appData, "\treceive_udp_packet(%d, %d, %d, %d);\n",
+                     ntohs(uh->sport),
+                     ntohs(uh->dport),
+                     ntohs(uh->len),
+                     ntohs(uh->checksum));
     }
 }
 
@@ -163,8 +178,12 @@ void callICMP(bool isScanner, const u_char *receivedPacket, char *appData) {
                      ntohs(ih->identifier),
                      ntohs(ih->sequenceNumber));
     } else {
-        std::sprintf(appData, "\tlisten_icmp_packet(%d);\n",
-                     ih->type);
+        std::sprintf(appData, "\treceive_icmp_packet(%d, %d, %d, %d, %d);\n",
+                     ih->type,
+                     ih->code,
+                     ntohs(ih->identifier),
+                     ntohs(ih->sequenceNumber),
+                     ntohs(ih->checksum));
     }
 }
 
@@ -210,13 +229,13 @@ void putMainIntoResult(const std::string &outputFile) {
     std::cout << "Программа успешно выполнена\n";
 }
 
-void fillFieldsScanner(const u_char *receivedPacket, int proto) {
+void fillFieldsScanner(const u_char *receivedPacket, int proto, const char* source_ip, const char* dest_ip) {
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6) {
         callTcp(true, receivedPacket, appData);
     } else if (proto == 17) {
-        callUdp(true, receivedPacket, appData);
+        callUdp(true, receivedPacket, appData, source_ip, dest_ip);
     } else if (proto == 67) {
         callDHCP(true, receivedPacket, appData);
     } else if (proto == 1) { // ICMP
@@ -234,13 +253,13 @@ void fillFieldsScanner(const u_char *receivedPacket, int proto) {
     }
 }
 
-void fillFieldsVictim(const u_char *receivedPacket, int proto) {
+void fillFieldsVictim(const u_char *receivedPacket, int proto, const char* source_ip, const char* dest_ip) {
     ip_header *iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
     char appData[350];
     if (proto == 6) {
         callTcp(false, receivedPacket, appData);
     } else if (proto == 17) {
-        callUdp(false, receivedPacket, appData);
+        callUdp(false, receivedPacket, appData, source_ip, dest_ip);
     } else if (proto == 67) {
         callDHCP(false, receivedPacket, appData);
     } else if (proto == 1) { // ICMP
@@ -282,7 +301,7 @@ void copyFileToString(const std::string& filename, std::string& content) {
     inputFile.close();
 }
 
-void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
+void analizer(const u_char *receivedPacket, bool is_scanner, int proto, const char* source_ip, const char* dest_ip) {
     if (templateFlag.firstCopied) {
         std::ifstream inputTemplate("samples/includes.cpp");
         std::ofstream outputResult("results/result.cpp", std::ios_base::app);
@@ -316,9 +335,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
         }
         fillTCPPacket(receivedPacket);
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 6);
+            fillFieldsScanner(receivedPacket, 6, source_ip, dest_ip);
         } else {
-            fillFieldsVictim(receivedPacket, 6);
+            fillFieldsVictim(receivedPacket, 6, source_ip, dest_ip);
         }
     } else if (proto == 17) {
         if (!templateFlag.udpCopied) {
@@ -334,9 +353,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
             outputResult.close();
         }
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 17);
+            fillFieldsScanner(receivedPacket, 17, source_ip, dest_ip);
         } else {
-            fillFieldsVictim(receivedPacket, 17);
+            fillFieldsVictim(receivedPacket, 17, source_ip, dest_ip);
         }
     } else if (proto == 1) { // ICMP
         if (!templateFlag.icmpCopied) {
@@ -352,9 +371,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
             outputResult.close();
         }
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 1);
+            fillFieldsScanner(receivedPacket, 1, source_ip, dest_ip);
         } else {
-            fillFieldsVictim(receivedPacket, 1);
+            fillFieldsVictim(receivedPacket, 1, source_ip, dest_ip);
         }
     } else if (proto == 2) { // ARP
         if (!templateFlag.arpCopied) {
@@ -370,9 +389,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
             outputResult.close();
         }
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 2);
+            fillFieldsScanner(receivedPacket, 2, source_ip, dest_ip);
         } else {
-            fillFieldsVictim(receivedPacket, 2);
+            fillFieldsVictim(receivedPacket, 2, source_ip, dest_ip);
         }
     } else if (proto == 67) {
         if (!templateFlag.dhcpCopied) {
@@ -388,9 +407,9 @@ void analizer(const u_char *receivedPacket, bool is_scanner, int proto) {
             outputResult.close();
         }
         if (is_scanner) {
-            fillFieldsScanner(receivedPacket, 67);
+            fillFieldsScanner(receivedPacket, 67, source_ip, dest_ip);
         } else {
-            fillFieldsVictim(receivedPacket, 67);
+            fillFieldsVictim(receivedPacket, 67, source_ip, dest_ip);
         }
     }
 }
