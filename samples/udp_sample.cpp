@@ -81,18 +81,36 @@ void send_and_receive_udp_packet(int source_port, int dest_port, const char* sou
     close(clientSocket);
 }
 
-void receive_udp_packet() {
+void receive_udp_packet(u_short expectedSourcePort, u_short expectedDestPort, u_short expectedLength, u_short expectedChecksum) {
     if (receivedPackets.empty()) {
         std::cout << "No UDP packets received." << std::endl;
         return;
     }
-    ReceivedPacket& receivedPacket = receivedPackets[0];
-    std::cout << "Source Port: " << ntohs(receivedPacket.sourcePort) << std::endl;
-    std::cout << "Destination Port: " << ntohs(receivedPacket.udpHeader.destinationPort) << std::endl;
-    std::cout << "Length: " << ntohs(receivedPacket.udpHeader.length) << std::endl;
-    std::cout << "Checksum: " << ntohs(receivedPacket.udpHeader.checksum) << std::endl;
-}
 
+    bool packetFound = false;
+
+    for (auto it = receivedPackets.begin(); it != receivedPackets.end(); ++it) {
+        if (it->udpHeader.sourcePort == expectedSourcePort &&
+            it->udpHeader.destinationPort == expectedDestPort &&
+            it->udpHeader.length == expectedLength &&
+            it->udpHeader.checksum == expectedChecksum) {
+
+            std::cout << "Matching packet found:" << std::endl;
+            std::cout << "Source Port: " << ntohs(it->sourcePort) << std::endl;
+            std::cout << "Destination Port: " << ntohs(it->udpHeader.destinationPort) << std::endl;
+            std::cout << "Length: " << ntohs(it->udpHeader.length) << std::endl;
+            std::cout << "Checksum: " << ntohs(it->udpHeader.checksum) << std::endl;
+
+            receivedPackets.erase(it);
+            packetFound = true;
+            break;
+        }
+    }
+
+    if (!packetFound) {
+        std::cout << "No matching packet found." << std::endl;
+    }
+}
 //int main() {
 //    const char* data = "Hello, UDP!";
 //    const int source_port = 64321;
