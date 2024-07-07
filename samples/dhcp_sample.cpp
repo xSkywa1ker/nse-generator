@@ -46,7 +46,7 @@ uint16_t checksum(uint16_t *buf, int nwords) {
 }
 
 void send_dhcp_discover(const char* interface, const u_char* client_mac, u_int32_t transaction_id, u_short flags, 
-                        const std::vector<std::vector<u_char>>& options) {
+                        u_char option_type, u_char option_length, u_char option_value) {
     int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (clientSocket < 0) {
         perror("Error creating socket");
@@ -72,11 +72,11 @@ void send_dhcp_discover(const char* interface, const u_char* client_mac, u_int32
     dhcpHeader.magic_cookie[2] = 0x53;
     dhcpHeader.magic_cookie[3] = 0x63;
 
+    // DHCP Options
     int option_index = 0;
-    for (const auto& option : options) {
-        memcpy(&dhcpHeader.options[option_index], option.data(), option.size());
-        option_index += option.size();
-    }
+    dhcpHeader.options[option_index++] = option_type;
+    dhcpHeader.options[option_index++] = option_length;
+    dhcpHeader.options[option_index++] = option_value;
     dhcpHeader.options[option_index++] = DHCP_OPTION_END;
 
     // Packet Buffer
@@ -134,11 +134,12 @@ int main() {
     u_int32_t transaction_id = 0x643c9869;
     u_short flags = 0x8000; // Broadcast flag
 
-    std::vector<std::vector<u_char>> options = {
-        {DHCP_OPTION_MESSAGE_TYPE, 1, DHCP_DISCOVER} // DHCP Discover
-    };
+    // DHCP Options
+    u_char option_type = DHCP_OPTION_MESSAGE_TYPE;
+    u_char option_length = 1;
+    u_char option_value = DHCP_DISCOVER;
 
-    send_dhcp_discover(interface, client_mac, transaction_id, flags, options);
+    send_dhcp_discover(interface, client_mac, transaction_id, flags, option_type, option_length, option_value);
 
     return 0;
 }
