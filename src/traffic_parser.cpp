@@ -63,15 +63,18 @@ int traffic_parser(const char *path_to_traffic, std::string ip_scanner, std::str
                     std::cout << "TCP" << std::endl;
                     analizer(packetData, is_scanner, 6, ip_src, ip_dest);
                 } else if (ipHeader->proto == 17) {
-                    udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
-                    if (udpHeader->sport == 67 || udpHeader->dport == 68) {
-                        std::cout << "DHCP" << std::endl;
-                        analizer(packetData, is_scanner, 67,ip_src, ip_dest);
-                    } else {
-                        std::cout << "UDP" << std::endl;
-                        analizer(packetData, is_scanner, 17, ip_src, ip_dest);
-                    }
-                } else if (ipHeader->proto == 1) {
+    udp_header *udpHeader = (udp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
+    uint16_t sport = ntohs(udpHeader->sport);
+    uint16_t dport = ntohs(udpHeader->dport);
+    if (sport == 67 || dport == 68 || sport == 68 || dport == 67) {
+        std::cout << "DHCP" << std::endl;
+        analizer(packetData, is_scanner, 67, ip_src, ip_dest);
+    } else {
+        std::cout << "UDP" << sport << std::endl;
+        analizer(packetData, is_scanner, 17, ip_src, ip_dest);
+    }
+}
+ else if (ipHeader->proto == 1) {
                     icmp_header *icmpHeader = (icmp_header *)(packetData + 14 + ((ipHeader->ver_ihl & 0x0F) * 4));
                     std::cout << "ICMP" << std::endl;
                     analizer(packetData, is_scanner, 1, ip_src, ip_dest);

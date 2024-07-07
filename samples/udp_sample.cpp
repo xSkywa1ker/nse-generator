@@ -15,6 +15,20 @@ struct UdpHeader {
     u_short checksum;
 };
 
+struct IpHeader {
+    unsigned char ihl : 4;
+    unsigned char version : 4;
+    unsigned char tos;
+    unsigned short tot_len;
+    unsigned short id;
+    unsigned short frag_off;
+    unsigned char ttl;
+    unsigned char protocol;
+    unsigned short check;
+    struct in_addr saddr;
+    struct in_addr daddr;
+};
+
 struct ReceivedPacket {
     UdpHeader udpHeader;
     int sourcePort;
@@ -39,42 +53,62 @@ unsigned short calculate_checksum(const char* data, size_t length) {
 }
 
 void send_udp_packet(int source_port, int dest_port, const char* source_ip, const char* dest_ip, size_t dataLength, const char* data) {
-    // Создание сокета
-    int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (clientSocket < 0) {
-        perror("Error creating socket");
+    // Создание сырого сокета
+    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+    if (sock < 0) {
+        perror("Error creating raw socket");
         return;
     }
 
-    // Заполнение структуры с информацией об адресе сервера
-    struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(dest_port);
-    serverAddress.sin_addr.s_addr = inet_addr(dest_ip);
+    // Заполнение структуры с информацией об адресе назначения
+    struct sockaddr_in dest_addr;
+    memset(&dest_addr, 0, sizeof(dest_addr));
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(dest_port);
+    dest_addr.sin_addr.s_addr = inet_addr(dest_ip);
 
-    UdpHeader udpHeader;
-    udpHeader.sourcePort = htons(source_port);
-    udpHeader.destinationPort = htons(dest_port);
-    udpHeader.length = htons(sizeof(UdpHeader) + dataLength);
-    udpHeader.checksum = 0;
+    // Подготовка IP-заголовка
+    char packet[sizeof(IpHeader) + sizeof(UdpHeader) + dataLength];
+    IpHeader* iph = (IpHeader*)packet;
+    UdpHeader* udph = (UdpHeader*)(packet + sizeof(IpHeader));
 
-    char buffer[sizeof(UdpHeader) + dataLength];
-    memcpy(buffer, &udpHeader, sizeof(UdpHeader));
-    memcpy(buffer + sizeof(UdpHeader), data, dataLength);
+    iph->ihl = 5;
+    iph->version = 4;
+    iph->tos = 0;
+    iph->tot_len = htons(sizeof(IpHeader) + sizeof(UdpHeader) + dataLength);
+    iph->id = htons(54321);
+    iph->frag_off = 0;
+    iph->ttl = 64;
+    iph->protocol = IPPROTO_UDP;
+    iph->check = 0;
+    iph->saddr.s_addr = inet_addr(source_ip);
+    iph->daddr.s_addr = inet_addr(dest_ip);
 
-    udpHeader.checksum = calculate_checksum(buffer, sizeof(UdpHeader) + dataLength);
-    memcpy(buffer, &udpHeader, sizeof(UdpHeader));
+    // Вычисление контрольной суммы IP-заголовка
+    iph->check = calculate_checksum((char*)iph, sizeof(IpHeader));
 
-    if (sendto(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
+    // Подготовка UDP-заголовка
+    udph->sourcePort = htons(source_port);
+    udph->destinationPort = htons(dest_port);
+    udph->length = htons(sizeof(UdpHeader) + dataLength);
+    udph->checksum = 0;
+
+    // Копирование данных в пакет
+    memcpy(packet + sizeof(IpHeader) + sizeof(UdpHeader), data, dataLength);
+
+    // Вычисление контрольной суммы UDP-заголовка
+    udph->checksum = calculate_checksum((char*)udph, sizeof(UdpHeader) + dataLength);
+
+    // Отправка пакета
+    if (sendto(sock, packet, sizeof(packet), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr)) < 0) {
         perror("Error sending packet");
-        close(clientSocket);
+        close(sock);
         return;
     }
 
-    std::cout << "UDP packet sent to " << dest_ip << ":" << dest_port << std::endl;
+    std::cout << "UDP packet sent from " << source_ip << " to " << dest_ip << ":" << dest_port << std::endl;
 
-    close(clientSocket);
+    close(sock);
 }
 
 void receive_udp_packet(int listen_port, u_short expectedSourcePort, u_short expectedDestPort, u_short expectedLength, u_short expectedChecksum) {

@@ -153,15 +153,24 @@ void callTcp(bool isScanner, const u_char *receivedPacket, char *appData) {
 }
 
 void callUdp(bool isScanner, const u_char *receivedPacket, char *appData, const char* source_ip, const char* dest_ip) {
-    udp_header* uh = (udp_header *)receivedPacket;
+    ip_header* iph = (ip_header *)(receivedPacket + SIZE_ETHERNET);
+    int ip_header_len = (iph->ver_ihl & 0x0F) * 4; // правильное вычисление длины IP-заголовка
+    udp_header* uh = (udp_header *)(receivedPacket + SIZE_ETHERNET + ip_header_len);
+
     if (isScanner) {
-        std::sprintf(appData, "\tsend_udp_packet(%d, %d, \"%s\", \"%s\", %d, \"%s\");\n",
+        std::sprintf(appData, "\tsend_udp_packet(%d, %d, \"%d.%d.%d.%d\", \"%d.%d.%d.%d\", %d, \"%s\");\n",
                      ntohs(uh->sport),
                      ntohs(uh->dport),
-                     source_ip,
-                     dest_ip,
+                     iph->saddr.byte1,
+                     iph->saddr.byte2,
+                     iph->saddr.byte3,
+                     iph->saddr.byte4,
+                     iph->daddr.byte1,
+                     iph->daddr.byte2,
+                     iph->daddr.byte3,
+                     iph->daddr.byte4,
                      ntohs(uh->len),
-                     "hello");
+                     "");
     } else {
         std::sprintf(appData, "\treceive_udp_packet(%d, %d, %d, %d);\n",
                      ntohs(uh->sport),

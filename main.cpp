@@ -13,6 +13,6 @@ int main(int argc, char *argv[]) {
     std::cout << "IP scanner: " << ip_scanner << std::endl;
     std::cout << "IP victim: " << ip_victim << std::endl;
 
-    traffic_parser("traffic/udp-flood-traffic.pcapng",ip_scanner,ip_victim);
+    traffic_parser("traffic/dhcp-dos-traffic.pcapng",ip_scanner,ip_victim);
     return 1;
 }
