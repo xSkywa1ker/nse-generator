@@ -4,7 +4,7 @@
 
 std::string ReplaceField(std::string scriptContent, const std::string &fieldName, const std::string &newValue);
 
-void analizer(const u_char *receivedPacket, bool is_scanner, int proto);
+void analizer(const u_char *receivedPacket, bool is_scanner, int proto, const char* source_ip, const char* dest_ip);
 
 void putMainIntoResult(const std::string &outputFile);
 
