@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cstring>
+#include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/ether.h>
@@ -10,6 +12,9 @@
 #include <vector>
 #include <pcap.h>
 #include <netinet/ip_icmp.h>
+#include <linux/if_packet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>  // Для использования ioctl и SIOCGIFINDEX
 
 #define MAX_PACKET_LIFETIME 120 // Максимальное время жизни пакета в секундах
 #define MAX_PACKET_SIZE 65535   // Максимальная длина пакета
@@ -19,6 +24,18 @@
 #define SIZE_ICMP 8
 #define SIZE_UDP 8
 #define MAX_OPTION_SIZE 40
+
+#define DHCP_DISCOVER 1
+#define DHCP_OFFER 2
+#define DHCP_REQUEST 3
+#define DHCP_DECLINE 4
+#define DHCP_ACK 5
+#define DHCP_NAK 6
+#define DHCP_RELEASE 7
+#define DHCP_INFORM 8
+
+#define DHCP_OPTION_MESSAGE_TYPE 53
+#define DHCP_OPTION_END 255
 
 typedef struct arp_header {
     u_short hardware_type;     // Тип аппаратного устройства
@@ -105,6 +122,8 @@ typedef struct dhcp_header {
     u_char chaddr[16];
     u_char sname[64];
     u_char file[128];
+    u_char magic_cookie[4];
+    u_char options[308];
 } dhcp_header;
 
 struct TemplateFlag {
@@ -214,20 +233,45 @@ void callICMP(bool isScanner, const u_char *receivedPacket, char *appData) {
     }
 }
 
-
-
 void callDHCP(bool isScanner, const u_char *receivedPacket, char *appData) {
-    dhcp_header* dhcph = (dhcp_header*)receivedPacket;
+    // Parse IP header
+    ip_header* iph = (ip_header*)(receivedPacket + SIZE_ETHERNET);
+    int ip_header_len = (iph->ver_ihl & 0x0F) * 4;
+
+    // Parse UDP header
+    udp_header* udph = (udp_header*)(receivedPacket + SIZE_ETHERNET + ip_header_len);
+
+    // Parse DHCP header
+    dhcp_header* dhcph = (dhcp_header*)(receivedPacket + SIZE_ETHERNET + ip_header_len + sizeof(udp_header));
+
+    // Extract DHCP options
+    u_char* options = dhcph->options;
+    u_char option_type = 0;
+    u_char option_length = 0;
+    u_char option_value = 0;
+
+    for (int i = 0; i < 308;) {
+        option_type = options[i++];
+        if (option_type == DHCP_OPTION_END) break;
+        option_length = options[i++];
+        option_value = options[i];
+        i += option_length;
+    }
+
+    // Convert IP addresses to strings
+    char src_ip[INET_ADDRSTRLEN], dest_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &iph->saddr, src_ip, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &iph->daddr, dest_ip, INET_ADDRSTRLEN);
+
     if (isScanner) {
-        std::sprintf(appData, "\tsend_dhcp_packet(\"eth0\", \"%02x:%02x:%02x:%02x:%02x:%02x\", \"0.0.0.0\", \"ff:ff:ff:ff:ff:ff\", \"255.255.255.255\", %u, %u, %u, %u, %u, %u, %u, \"%02x:%02x:%02x:%02x:%02x:%02x\", \"%s\", \"%s\");\n",
+        std::sprintf(appData, "\tsend_dhcp_discover(\"ens33\", \"%02x:%02x:%02x:%02x:%02x:%02x\", %u, %u, %u, %u, %u, %u, %u, %d, \"%s\", \"%s\", %u, %u, %u, %u, %u);\n",
                      dhcph->chaddr[0], dhcph->chaddr[1], dhcph->chaddr[2], dhcph->chaddr[3], dhcph->chaddr[4], dhcph->chaddr[5],
                      ntohl(dhcph->xid), ntohs(dhcph->secs), ntohs(dhcph->flags), ntohl(dhcph->ciaddr),
                      ntohl(dhcph->yiaddr), ntohl(dhcph->siaddr), ntohl(dhcph->giaddr),
-                     dhcph->chaddr[0], dhcph->chaddr[1], dhcph->chaddr[2], dhcph->chaddr[3], dhcph->chaddr[4], dhcph->chaddr[5],
-                     dhcph->sname, dhcph->file);
+                     iph->ttl, src_ip, dest_ip, ntohs(udph->sport), ntohs(udph->dport), option_type, option_length, option_value);
     } else {
-        std::sprintf(appData, "\tlisten_dhcp_packet(%u);\n",
-                     ntohl(dhcph->xid));
+        std::sprintf(appData, "\treceive_dhcp_offer(\"%s\");\n",
+                     "ens33");
     }
 }
 
@@ -255,7 +299,6 @@ void callARP(bool isScanner, const u_char *receivedPacket, char *appData) {
                  ntohs(ah->opcode) == ARPOP_REQUEST ? "\"request\"" : "\"reply\"");
     }
 }
-
 
 void putMainIntoResult(const std::string &outputFile) {
     std::ofstream output(outputFile, std::ios_base::app);
@@ -492,3 +535,4 @@ int HEX_TO_DEC(const std::string &st) {
     }
     return num;
 }
+

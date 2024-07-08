@@ -10,10 +10,21 @@
 #include <netinet/udp.h>
 #include <linux/if_packet.h>
 #include <net/if.h>
+#include <sys/ioctl.h>  // Added for SIOCGIFINDEX and ioctl
 
 #define DHCP_DISCOVER 1
+#define DHCP_OFFER 2
+#define DHCP_REQUEST 3
+#define DHCP_DECLINE 4
+#define DHCP_ACK 5
+#define DHCP_NAK 6
+#define DHCP_RELEASE 7
+#define DHCP_INFORM 8
+
 #define DHCP_OPTION_MESSAGE_TYPE 53
 #define DHCP_OPTION_END 255
+
+#define SIZE_ETHERNET 14
 
 struct DhcpHeader {
     u_char op;
@@ -34,6 +45,27 @@ struct DhcpHeader {
     u_char options[308];
 };
 
+struct ip_header {
+    u_char ver_ihl;
+    u_char tos;
+    u_short tlen;
+    u_short identification;
+    u_short flags_fo;
+    u_char ttl;
+    u_char proto;
+    u_short crc;
+    struct in_addr saddr;
+    struct in_addr daddr;
+    u_int op_pad;
+};
+
+struct udp_header {
+    u_short sport;
+    u_short dport;
+    u_short len;
+    u_short crc;
+};
+
 uint16_t checksum(uint16_t *buf, int nwords) {
     uint32_t sum = 0;
     for (int i = 0; i < nwords; i++) {
@@ -45,8 +77,19 @@ uint16_t checksum(uint16_t *buf, int nwords) {
     return htons(~sum);
 }
 
-void send_dhcp_discover(const char* interface, const u_char* client_mac, u_int32_t transaction_id, u_short flags, 
+void mac_str_to_bytes(const char* mac_str, u_char* mac_bytes) {
+    sscanf(mac_str, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+           &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+           &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+}
+
+void send_dhcp_discover(const char* interface, const char* client_mac_str, u_int32_t transaction_id, u_short secs, u_short flags,
+                        u_int32_t ciaddr, u_int32_t yiaddr, u_int32_t siaddr, u_int32_t giaddr,
+                        u_char ttl, const char* src_ip, const char* dest_ip, u_short src_port, u_short dest_port,
                         u_char option_type, u_char option_length, u_char option_value) {
+    u_char client_mac[6];
+    mac_str_to_bytes(client_mac_str, client_mac);
+
     int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (clientSocket < 0) {
         perror("Error creating socket");
@@ -60,12 +103,12 @@ void send_dhcp_discover(const char* interface, const u_char* client_mac, u_int32
     dhcpHeader.hlen = 6; // Hardware address length
     dhcpHeader.hops = 0;
     dhcpHeader.xid = htonl(transaction_id); // Transaction ID
-    dhcpHeader.secs = htons(0);
+    dhcpHeader.secs = htons(secs);
     dhcpHeader.flags = htons(flags); // Flags
-    dhcpHeader.ciaddr = htonl(0);
-    dhcpHeader.yiaddr = htonl(0);
-    dhcpHeader.siaddr = htonl(0);
-    dhcpHeader.giaddr = htonl(0);
+    dhcpHeader.ciaddr = ciaddr;
+    dhcpHeader.yiaddr = yiaddr;
+    dhcpHeader.siaddr = siaddr;
+    dhcpHeader.giaddr = giaddr;
     memcpy(dhcpHeader.chaddr, client_mac, 6);
     dhcpHeader.magic_cookie[0] = 0x63;
     dhcpHeader.magic_cookie[1] = 0x82;
@@ -95,17 +138,17 @@ void send_dhcp_discover(const char* interface, const u_char* client_mac, u_int32
     ip->tos = 0x00;
     ip->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(DhcpHeader) - 308 + option_index);
     ip->id = htons(0);
-    ip->ttl = 64;
+    ip->ttl = ttl;
     ip->protocol = IPPROTO_UDP;
-    ip->saddr = inet_addr("0.0.0.0");
-    ip->daddr = inet_addr("255.255.255.255");
+    ip->saddr = inet_addr(src_ip);
+    ip->daddr = inet_addr(dest_ip);
     ip->check = 0;
     ip->check = checksum((uint16_t *)ip, ip->ihl * 2);
 
     // UDP Header
     struct udphdr *udp = (struct udphdr *)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
-    udp->source = htons(68);
-    udp->dest = htons(67);
+    udp->source = htons(src_port);
+    udp->dest = htons(dest_port);
     udp->len = htons(sizeof(struct udphdr) + sizeof(DhcpHeader) - 308 + option_index);
     udp->check = 0;
 
@@ -128,19 +171,69 @@ void send_dhcp_discover(const char* interface, const u_char* client_mac, u_int32
     close(clientSocket);
 }
 
-int main() {
-    const char* interface = "ens33";
-    const u_char client_mac[6] = {0x00, 0x0c, 0x29, 0x95, 0xc3, 0x64};
-    u_int32_t transaction_id = 0x643c9869;
-    u_short flags = 0x8000; // Broadcast flag
+void receive_dhcp_offer(const char* interface) {
+    int sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (sockfd < 0) {
+        perror("Error creating socket");
+        return;
+    }
 
-    // DHCP Options
-    u_char option_type = DHCP_OPTION_MESSAGE_TYPE;
-    u_char option_length = 1;
-    u_char option_value = DHCP_DISCOVER;
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ - 1);
+    if (ioctl(sockfd, SIOCGIFINDEX, &ifr) < 0) {
+        perror("Error getting interface index");
+        close(sockfd);
+        return;
+    }
 
-    send_dhcp_discover(interface, client_mac, transaction_id, flags, option_type, option_length, option_value);
+    struct sockaddr_ll sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sll_family = AF_PACKET;
+    sa.sll_ifindex = ifr.ifr_ifindex;
+    sa.sll_protocol = htons(ETH_P_ALL);
 
-    return 0;
+    if (bind(sockfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+        perror("Error binding socket to interface");
+        close(sockfd);
+        return;
+    }
+
+    uint8_t buffer[1500];
+    while (true) {
+        int recvBytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
+        if (recvBytes < 0) {
+            perror("Error receiving packet");
+            continue;
+        }
+
+        struct ethhdr *eth = (struct ethhdr *)buffer;
+        if (ntohs(eth->h_proto) != ETH_P_IP) {
+            continue;
+        }
+
+        struct iphdr *ip = (struct iphdr *)(buffer + sizeof(struct ethhdr));
+        if (ip->protocol != IPPROTO_UDP) {
+            continue;
+        }
+
+        struct udphdr *udp = (struct udphdr *)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
+        if (ntohs(udp->source) != 67 || ntohs(udp->dest) != 68) {
+            continue;
+        }
+
+        DhcpHeader *dhcp = (DhcpHeader *)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr));
+        if (dhcp->op != 2) { // Boot Reply
+            continue;
+        }
+
+        std::cout << "Received DHCP Offer" << std::endl;
+        std::cout << "Your IP Address: " << inet_ntoa(*(struct in_addr *)&dhcp->yiaddr) << std::endl;
+        break;
+    }
+
+    close(sockfd);
 }
+
+
 
