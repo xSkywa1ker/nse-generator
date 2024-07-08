@@ -1,6 +1,31 @@
-#define MAX_PACKETS 100
+#include <iostream>
+#include <cstring>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <vector>
+#include <net/ethernet.h>
+#include <netinet/ip.h>
+#include <netinet/udp.h>
+#include <linux/if_packet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>  // Added for SIOCGIFINDEX and ioctl
 
-// Структура для DHCP заголовка
+#define DHCP_DISCOVER 1
+#define DHCP_OFFER 2
+#define DHCP_REQUEST 3
+#define DHCP_DECLINE 4
+#define DHCP_ACK 5
+#define DHCP_NAK 6
+#define DHCP_RELEASE 7
+#define DHCP_INFORM 8
+
+#define DHCP_OPTION_MESSAGE_TYPE 53
+#define DHCP_OPTION_END 255
+
+#define SIZE_ETHERNET 14
+
 struct DhcpHeader {
     u_char op;
     u_char htype;
@@ -16,169 +41,199 @@ struct DhcpHeader {
     u_char chaddr[16];
     u_char sname[64];
     u_char file[128];
+    u_char magic_cookie[4];
+    u_char options[308];
 };
 
-// Структура для DHCP опции
-struct DhcpOption {
-    u_char code;
-    u_char length;
-    u_char data[256];
+struct ip_header {
+    u_char ver_ihl;
+    u_char tos;
+    u_short tlen;
+    u_short identification;
+    u_short flags_fo;
+    u_char ttl;
+    u_char proto;
+    u_short crc;
+    struct in_addr saddr;
+    struct in_addr daddr;
+    u_int op_pad;
 };
 
-// Структура для полученного DHCP пакета
-struct ReceivedDhcpPacket {
-    DhcpHeader dhcpHeader;
-    std::vector<DhcpOption> options;
+struct udp_header {
+    u_short sport;
+    u_short dport;
+    u_short len;
+    u_short crc;
 };
 
-std::vector<ReceivedDhcpPacket> receivedDhcpPackets;
+uint16_t checksum(uint16_t *buf, int nwords) {
+    uint32_t sum = 0;
+    for (int i = 0; i < nwords; i++) {
+        sum += ntohs(buf[i]);
+    }
+    while (sum >> 16) {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+    return htons(~sum);
+}
 
-// Функция для отправки и получения DHCP пакетов
-void send_dhcp_packet(const char* interface, const char* source_mac, const char* source_ip, const char* target_mac, const char* target_ip,
-                      u_int32_t transaction_id, u_short secs, u_short flags, u_int32_t client_ip, u_int32_t your_ip,
-                      u_int32_t server_ip, u_int32_t gateway_ip, const char* client_mac, const char* server_name,
-                      const char* filename) {
-    // Создание сокета для отправки и получения пакетов
+void mac_str_to_bytes(const char* mac_str, u_char* mac_bytes) {
+    sscanf(mac_str, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+           &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+           &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+}
+
+void send_dhcp_discover(const char* interface, const char* client_mac_str, u_int32_t transaction_id, u_short secs, u_short flags,
+                        u_int32_t ciaddr, u_int32_t yiaddr, u_int32_t siaddr, u_int32_t giaddr,
+                        u_char ttl, const char* src_ip, const char* dest_ip, u_short src_port, u_short dest_port,
+                        u_char option_type, u_char option_length, u_char option_value) {
+    u_char client_mac[6];
+    mac_str_to_bytes(client_mac_str, client_mac);
+
     int clientSocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (clientSocket < 0) {
         perror("Error creating socket");
         return;
     }
 
-    // Заполнение DHCP заголовка
-    DhcpHeader dhcpHeader;
-    dhcpHeader.op = 1; // Операция: Запрос
-    dhcpHeader.htype = 1; // Тип аппаратного устройства: Ethernet
-    dhcpHeader.hlen = 6; // Длина аппаратного адреса: 6 байт (MAC-адрес)
-    dhcpHeader.xid = htonl(transaction_id); // Идентификатор транзакции
-    dhcpHeader.secs = htons(secs); // Время, прошедшее с начала процесса запроса (в секундах)
-    dhcpHeader.flags = htons(flags); // Флаги
-    dhcpHeader.ciaddr = htonl(client_ip); // IP адрес клиента
-    dhcpHeader.yiaddr = htonl(your_ip); // Предложенный IP адрес
-    dhcpHeader.siaddr = htonl(server_ip); // IP адрес DHCP сервера
-    dhcpHeader.giaddr = htonl(gateway_ip); // IP адрес шлюза
-    // Заполнение других полей DHCP заголовка в соответствии с переданными значениями
-    memcpy(dhcpHeader.chaddr, client_mac, 6); // MAC адрес клиента
-    strncpy(reinterpret_cast<char*>(dhcpHeader.sname), server_name, sizeof(dhcpHeader.sname)); // Имя сервера
-    strncpy(reinterpret_cast<char*>(dhcpHeader.file), filename, sizeof(dhcpHeader.file)); // Имя файла
+    // DHCP Header
+    DhcpHeader dhcpHeader = {0};
+    dhcpHeader.op = 1; // Boot Request
+    dhcpHeader.htype = 1; // Ethernet
+    dhcpHeader.hlen = 6; // Hardware address length
+    dhcpHeader.hops = 0;
+    dhcpHeader.xid = htonl(transaction_id); // Transaction ID
+    dhcpHeader.secs = htons(secs);
+    dhcpHeader.flags = htons(flags); // Flags
+    dhcpHeader.ciaddr = ciaddr;
+    dhcpHeader.yiaddr = yiaddr;
+    dhcpHeader.siaddr = siaddr;
+    dhcpHeader.giaddr = giaddr;
+    memcpy(dhcpHeader.chaddr, client_mac, 6);
+    dhcpHeader.magic_cookie[0] = 0x63;
+    dhcpHeader.magic_cookie[1] = 0x82;
+    dhcpHeader.magic_cookie[2] = 0x53;
+    dhcpHeader.magic_cookie[3] = 0x63;
 
-    // Создание буфера для хранения DHCP пакета
-    char buffer[sizeof(DhcpHeader)];
-    memcpy(buffer, &dhcpHeader, sizeof(DhcpHeader));
+    // DHCP Options
+    int option_index = 0;
+    dhcpHeader.options[option_index++] = option_type;
+    dhcpHeader.options[option_index++] = option_length;
+    dhcpHeader.options[option_index++] = option_value;
+    dhcpHeader.options[option_index++] = DHCP_OPTION_END;
 
-    // Установка параметров сокета
-    struct sockaddr addr;
-    memset(&addr, 0, sizeof(addr));
-    strcpy(addr.sa_data, interface);
+    // Packet Buffer
+    uint8_t buffer[1500] = {0};
 
-    // Отправка DHCP пакета
-    sendto(clientSocket, buffer, sizeof(buffer), 0, &addr, sizeof(addr));
+    // Ethernet Header
+    struct ethhdr *eth = (struct ethhdr *)buffer;
+    memset(eth->h_dest, 0xff, 6); // Broadcast
+    memcpy(eth->h_source, client_mac, 6);
+    eth->h_proto = htons(ETH_P_IP);
 
-    // Получение DHCP пакетов
-    char receivedBuffer[2048];
-    while (receivedDhcpPackets.size() < MAX_PACKETS) {
-        int bytesReceived = recvfrom(clientSocket, receivedBuffer, sizeof(receivedBuffer), 0, NULL, NULL);
-        if (bytesReceived > 0) {
-            // Приведение полученного буфера к структуре DHCP заголовка и опций
-            ReceivedDhcpPacket receivedDhcpPacket;
-            memcpy(&receivedDhcpPacket.dhcpHeader, receivedBuffer, sizeof(DhcpHeader));
-            // Дополнительная обработка для получения опций DHCP
-            // Пример добавления опции в вектор
-            int offset = sizeof(DhcpHeader);
-            while (offset < bytesReceived) {
-                DhcpOption option;
-                option.code = receivedBuffer[offset++];
-                if (option.code == 0xff) break; // Конец списка опций
-                option.length = receivedBuffer[offset++];
-                memcpy(option.data, receivedBuffer + offset, option.length);
-                offset += option.length;
-                receivedDhcpPacket.options.push_back(option);
-            }
-            receivedDhcpPackets.push_back(receivedDhcpPacket);
-        }
+    // IP Header
+    struct iphdr *ip = (struct iphdr *)(buffer + sizeof(struct ethhdr));
+    ip->ihl = 5;
+    ip->version = 4;
+    ip->tos = 0x00;
+    ip->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(DhcpHeader) - 308 + option_index);
+    ip->id = htons(0);
+    ip->ttl = ttl;
+    ip->protocol = IPPROTO_UDP;
+    ip->saddr = inet_addr(src_ip);
+    ip->daddr = inet_addr(dest_ip);
+    ip->check = 0;
+    ip->check = checksum((uint16_t *)ip, ip->ihl * 2);
+
+    // UDP Header
+    struct udphdr *udp = (struct udphdr *)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
+    udp->source = htons(src_port);
+    udp->dest = htons(dest_port);
+    udp->len = htons(sizeof(struct udphdr) + sizeof(DhcpHeader) - 308 + option_index);
+    udp->check = 0;
+
+    // DHCP Payload
+    uint8_t *dhcp = buffer + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr);
+    memcpy(dhcp, &dhcpHeader, sizeof(DhcpHeader) - 308 + option_index);
+
+    struct sockaddr_ll addr = {0};
+    addr.sll_ifindex = if_nametoindex(interface);
+    addr.sll_halen = ETH_ALEN;
+    memset(addr.sll_addr, 0xff, 6);
+
+    int sentBytes = sendto(clientSocket, buffer, sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(DhcpHeader) - 308 + option_index, 0, (struct sockaddr *)&addr, sizeof(addr));
+    if (sentBytes < 0) {
+        perror("Error sending packet");
+    } else {
+        std::cout << "Packet sent successfully, bytes: " << sentBytes << std::endl;
     }
 
     close(clientSocket);
 }
 
-// Функция для приема и сравнения DHCP пакетов
-void receive_dhcp_packet(u_int32_t expected_xid, u_short expected_secs, u_short expected_flags, u_int32_t expected_ciaddr,
-                         u_int32_t expected_yiaddr, u_int32_t expected_siaddr, u_int32_t expected_giaddr, const char* expected_chaddr,
-                         const char* expected_sname, const char* expected_file) {
-    if (receivedDhcpPackets.empty()) {
-        printf("No DHCP packets received.\n");
+void receive_dhcp_offer(const char* interface) {
+    int sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (sockfd < 0) {
+        perror("Error creating socket");
         return;
     }
 
-    bool packetFound = false;
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ - 1);
+    if (ioctl(sockfd, SIOCGIFINDEX, &ifr) < 0) {
+        perror("Error getting interface index");
+        close(sockfd);
+        return;
+    }
 
-    for (auto it = receivedDhcpPackets.begin(); it != receivedDhcpPackets.end(); ++it) {
-        DhcpHeader& header = it->dhcpHeader;
+    struct sockaddr_ll sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sll_family = AF_PACKET;
+    sa.sll_ifindex = ifr.ifr_ifindex;
+    sa.sll_protocol = htons(ETH_P_ALL);
 
-        if (header.xid == expected_xid &&
-            header.secs == expected_secs &&
-            header.flags == expected_flags &&
-            header.ciaddr == expected_ciaddr &&
-            header.yiaddr == expected_yiaddr &&
-            header.siaddr == expected_siaddr &&
-            header.giaddr == expected_giaddr &&
-            memcmp(header.chaddr, expected_chaddr, 6) == 0 &&
-            strncmp(reinterpret_cast<char*>(header.sname), expected_sname, sizeof(header.sname)) == 0 &&
-            strncmp(reinterpret_cast<char*>(header.file), expected_file, sizeof(header.file)) == 0) {
+    if (bind(sockfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+        perror("Error binding socket to interface");
+        close(sockfd);
+        return;
+    }
 
-            printf("Matching packet found:\n");
-            printf("DHCP Header:\n");
-            printf(" - Transaction ID: %u\n", ntohl(header.xid));
-            printf(" - Seconds: %u\n", ntohs(header.secs));
-            printf(" - Flags: %u\n", ntohs(header.flags));
-            printf(" - Client IP: %s\n", inet_ntoa(*(struct in_addr*)&header.ciaddr));
-            printf(" - Your IP: %s\n", inet_ntoa(*(struct in_addr*)&header.yiaddr));
-            printf(" - Server IP: %s\n", inet_ntoa(*(struct in_addr*)&header.siaddr));
-            printf(" - Gateway IP: %s\n", inet_ntoa(*(struct in_addr*)&header.giaddr));
-            printf(" - Client MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
-                   header.chaddr[0], header.chaddr[1], header.chaddr[2],
-                   header.chaddr[3], header.chaddr[4], header.chaddr[5]);
-            printf(" - Server Name: %s\n", header.sname);
-            printf(" - Boot Filename: %s\n", header.file);
-
-            // Удаление пакета из массива
-            receivedDhcpPackets.erase(it);
-            packetFound = true;
-            break;
+    uint8_t buffer[1500];
+    while (true) {
+        int recvBytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
+        if (recvBytes < 0) {
+            perror("Error receiving packet");
+            continue;
         }
+
+        struct ethhdr *eth = (struct ethhdr *)buffer;
+        if (ntohs(eth->h_proto) != ETH_P_IP) {
+            continue;
+        }
+
+        struct iphdr *ip = (struct iphdr *)(buffer + sizeof(struct ethhdr));
+        if (ip->protocol != IPPROTO_UDP) {
+            continue;
+        }
+
+        struct udphdr *udp = (struct udphdr *)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
+        if (ntohs(udp->source) != 67 || ntohs(udp->dest) != 68) {
+            continue;
+        }
+
+        DhcpHeader *dhcp = (DhcpHeader *)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr));
+        if (dhcp->op != 2) { // Boot Reply
+            continue;
+        }
+
+        std::cout << "Received DHCP Offer" << std::endl;
+        std::cout << "Your IP Address: " << inet_ntoa(*(struct in_addr *)&dhcp->yiaddr) << std::endl;
+        break;
     }
 
-    if (!packetFound) {
-        printf("No matching packet found.\n");
-    }
+    close(sockfd);
 }
 
-//int main() {
-//    // Здесь передайте необходимые параметры для отправки DHCP пакета
-//    const char* interface = "eth0";
-//    const char* source_mac = "00:11:22:33:44:55";
-//    const char* source_ip = "192.168.1.2";
-//    const char* target_mac = "ff:ff:ff:ff:ff:ff"; // Broadcast MAC для DHCP
-//    const char* target_ip = "255.255.255.255"; // Broadcast IP для DHCP
-//
-//    // Заполните остальные поля DHCP пакета
-//    u_int32_t transaction_id = 123456;
-//    u_short secs = 10;
-//    u_short flags = 0;
-//    u_int32_t client_ip = 0; // Неизвестный IP адрес клиента
-//    u_int32_t your_ip = 0; // Неизвестный IP адрес, который будет присвоен клиенту
-//    u_int32_t server_ip = 0; // Неизвестный IP адрес DHCP сервера
-//    u_int32_t gateway_ip = 0; // Неизвестный IP адрес шлюза
-//    const char* client_mac = "00:11:22:33:44:55"; // MAC адрес клиента
-//    const char* server_name = "myserver"; // Имя DHCP сервера
-//    const char* filename = "bootfile"; // Имя файла загрузки
-//
-//    // Отправка DHCP пакета и ожидание ответа
-//    send_dhcp_packet(interface, source_mac, source_ip, target_mac, target_ip, transaction_id, secs, flags,
-//                     client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
-//
-//    // Прием и сравнение DHCP пакета
-//    receive_dhcp_packet(transaction_id, secs, flags, client_ip, your_ip, server_ip, gateway_ip, client_mac, server_name, filename);
-//
-//    return 0;
-//}
+
+
